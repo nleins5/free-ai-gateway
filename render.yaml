@@ -23,3 +23,5 @@ services:
         sync: false
       - key: ROUTING_MODE
         value: "weighted"
+      - key: DATABASE_URL
+        sync: false

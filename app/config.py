@@ -18,6 +18,7 @@ ADAPTIVE_ROUTING = os.getenv("ADAPTIVE_ROUTING", "1").strip().lower() in {"1", "
 ADAPTIVE_LATENCY_ALPHA = min(max(float(os.getenv("ADAPTIVE_LATENCY_ALPHA", "0.3")), 0.05), 0.95)
 ADAPTIVE_ERROR_PENALTY = min(max(float(os.getenv("ADAPTIVE_ERROR_PENALTY", "0.5")), 0.05), 0.95)
 RAG_STORE_PATH = os.getenv("RAG_STORE_PATH", ".rag_store.json")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/nexus_gateway")
 RAG_TOP_K = max(int(os.getenv("RAG_TOP_K", "4")), 1)
 RAG_MAX_CHUNK_CHARS = max(int(os.getenv("RAG_MAX_CHUNK_CHARS", "900")), 200)
 RAG_CHUNK_OVERLAP_CHARS = max(int(os.getenv("RAG_CHUNK_OVERLAP_CHARS", "120")), 0)

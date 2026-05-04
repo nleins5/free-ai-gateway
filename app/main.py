@@ -5,17 +5,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import chat, images, rag, audio
+from app.api.v1 import chat, images, rag, audio, conversations, users
 from app.api import admin
 from app.config import settings, RAG_STORE_PATH
 from app.core.state import StateStore
 from app.services.rag import SimpleRAGStore, RAGService
 from app.services.router import RouterService
+from app.database import init_db
 
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize Database
+    await init_db()
+    
     # Initialize StateStore
     state_store = StateStore()
     app.state.state_store = state_store
@@ -52,6 +56,8 @@ app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
 app.include_router(images.router, prefix="/v1/images", tags=["Images"])
 app.include_router(rag.router, prefix="/v1/rag", tags=["RAG"])
 app.include_router(audio.router, prefix="/v1/audio", tags=["Audio"])
+app.include_router(conversations.router, prefix="/v1/conversations", tags=["Conversations"])
+app.include_router(users.router, prefix="/v1/users", tags=["Users"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 
 
