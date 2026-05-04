@@ -5,26 +5,15 @@ import {
   ArrowRight, 
   Terminal, 
   Zap, 
-  ShieldCheck, 
   Activity, 
-  Layers, 
   Cpu, 
-  Globe, 
-  CheckCircle2,
-  ChevronRight,
   Send,
   Image as ImageIcon,
   Loader2,
-  Lock,
-  BarChart3,
-  Search,
   MessageSquare,
-  Sparkles,
-  RefreshCcw,
-  Clock,
-  Database
+  Clock
 } from 'lucide-react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -516,7 +505,7 @@ const Playground = () => {
         const data = await res.json();
         setResponse(data.data[0].url);
       }
-    } catch (err) {
+    } catch {
       setResponse("Error connecting to neural gateway.");
     } finally {
       setLoading(false);
