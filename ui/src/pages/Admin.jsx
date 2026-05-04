@@ -3,6 +3,8 @@ import gsap from 'gsap';
 import { Activity, Zap, DollarSign, Server, RefreshCw, Terminal, Shield, Cpu, Binary, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+
 const MagneticButton = ({ children, className = "", onClick, to, variant = "primary", disabled, type="button" }) => {
   const btnRef = useRef(null);
 
@@ -135,8 +137,8 @@ const Admin = () => {
     try {
       const headers = { 'X-Admin-Key': currentSecret };
       const [statsRes, providersRes] = await Promise.all([
-        fetch('/admin/stats', { headers }),
-        fetch('/admin/providers', { headers })
+        fetch(`${API_BASE}/admin/stats`, { headers }),
+        fetch(`${API_BASE}/admin/providers`, { headers })
       ]);
 
       if (statsRes.status === 403 || providersRes.status === 403) {
@@ -177,6 +179,8 @@ const Admin = () => {
       }
     } catch (error) {
       console.error("Telemetry failure:", error);
+      setAuthError('Cannot reach backend server. Make sure it is running.');
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
