@@ -1,0 +1,7 @@
+[tool.pyrefly]
+# Only analyze actual project Python files
+source = ["app", "tests"]
+# Use the project venv for package resolution
+python_interpreter = "venv/bin/python"
+# Exclude non-project directories
+exclude = ["venv", "node_modules", "ui", ".planning", "__pycache__", ".git"]
