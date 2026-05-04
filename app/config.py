@@ -1,0 +1,114 @@
+import os
+import json
+from typing import Any, Dict, List, Tuple
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# --- CONSTANTS ---
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "changeme")
+PROVIDERS_JSON_PATH = os.getenv("PROVIDERS_JSON_PATH", "providers.json")
+REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "30"))
+IMAGE_MAX_WAIT_MS = max(int(os.getenv("IMAGE_MAX_WAIT_MS", "9500")), 1000)
+MAX_RETRIES_PER_PROVIDER = max(int(os.getenv("MAX_RETRIES_PER_PROVIDER", "1")), 0)
+PROVIDER_FAILURE_THRESHOLD = max(int(os.getenv("PROVIDER_FAILURE_THRESHOLD", "2")), 1)
+PROVIDER_COOLDOWN_S = max(float(os.getenv("PROVIDER_COOLDOWN_S", "60")), 0.0)
+ADAPTIVE_ROUTING = os.getenv("ADAPTIVE_ROUTING", "1").strip().lower() in {"1", "true", "yes", "on"}
+ADAPTIVE_LATENCY_ALPHA = min(max(float(os.getenv("ADAPTIVE_LATENCY_ALPHA", "0.3")), 0.05), 0.95)
+ADAPTIVE_ERROR_PENALTY = min(max(float(os.getenv("ADAPTIVE_ERROR_PENALTY", "0.5")), 0.05), 0.95)
+RAG_STORE_PATH = os.getenv("RAG_STORE_PATH", ".rag_store.json")
+RAG_TOP_K = max(int(os.getenv("RAG_TOP_K", "4")), 1)
+RAG_MAX_CHUNK_CHARS = max(int(os.getenv("RAG_MAX_CHUNK_CHARS", "900")), 200)
+RAG_CHUNK_OVERLAP_CHARS = max(int(os.getenv("RAG_CHUNK_OVERLAP_CHARS", "120")), 0)
+APP_NAME = os.getenv("APP_NAME", "free-ai-gateway")
+ROUTING_MODE = os.getenv("ROUTING_MODE", "round_robin").strip().lower()
+
+# Cost per 1M tokens (input, output)
+COST_PER_1M: Dict[str, Tuple[float, float]] = {
+    "groq": (0.05, 0.10),
+    "gemini": (0.075, 0.30),
+    "github": (0.0, 0.0),
+    "cerebras": (0.0, 0.0),
+    "sambanova": (0.10, 0.10),
+    "cloudflare": (0.0, 0.0),
+    "openrouter": (0.0, 0.0),
+    "huggingface": (0.0, 0.0),
+    "freetheai": (0.0, 0.0),
+    "ollama": (0.0, 0.0),
+    "together": (0.0, 0.0),
+    "xai": (0.0, 0.0),
+    "claude": (0.0, 0.0),
+    "nvidia": (0.0, 0.0),
+    "nvidia_33": (0.0, 0.0),
+    "nvidia_77": (0.0, 0.0),
+    "nvidia_custom": (0.0, 0.0),
+}
+
+# --- DYNAMIC STATE ---
+# These are loaded from providers.json and updated via reload_config()
+_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github,cerebras,huggingface,sambanova,groq,gemini,cloudflare,openrouter,freetheai").split(",") if s.strip()]
+_DEFAULT_TASK_TIERS = {
+    "general": ["github", "huggingface", "groq", "gemini", "cloudflare"],
+    "code": ["github", "huggingface", "cerebras", "groq"],
+    "vision": ["github", "gemini"],
+    "image": ["cloudflare", "huggingface", "freetheai"],
+    "gemma": ["groq", "openrouter", "huggingface"]
+}
+
+class Settings:
+    """Mutable runtime settings — reloaded from providers.json on demand."""
+
+    def __init__(self):
+        self.provider_chain: List[str] = list(_DEFAULT_CHAIN)
+        self.task_tiers: Dict[str, List[str]] = dict(_DEFAULT_TASK_TIERS)
+        self.dynamic_weights: Dict[str, int] = {}
+        self.budget_daily_limit_usd: float = 0.0
+
+    # ── Attribute accessors used by admin.py ──────────────────────
+    @property
+    def routing_mode(self) -> str:
+        return ROUTING_MODE
+
+    @property
+    def admin_key(self) -> str:
+        return ADMIN_SECRET
+
+    @property
+    def provider_cooldown_s(self) -> float:
+        return PROVIDER_COOLDOWN_S
+
+settings = Settings()
+
+def reload_config():
+    """Reload settings from providers.json if it exists."""
+    path = PROVIDERS_JSON_PATH
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        return
+    
+    if not isinstance(cfg, dict):
+        return
+
+    if "provider_chain" in cfg and isinstance(cfg["provider_chain"], list):
+        settings.provider_chain = [s.strip().lower() for s in cfg["provider_chain"] if isinstance(s, str) and s.strip()]
+    
+    if "task_tiers" in cfg and isinstance(cfg["task_tiers"], dict):
+        settings.task_tiers.clear()
+        settings.task_tiers.update(cfg["task_tiers"])
+    
+    if "provider_weights" in cfg and isinstance(cfg["provider_weights"], dict):
+        settings.dynamic_weights.clear()
+        for k, v in cfg["provider_weights"].items():
+            if isinstance(k, str) and isinstance(v, (int, float)) and v > 0:
+                settings.dynamic_weights[k.strip().lower()] = int(v)
+    
+    budget = cfg.get("budget", {})
+    if isinstance(budget, dict):
+        settings.budget_daily_limit_usd = float(budget.get("daily_limit_usd", 0))
+
+# Load on startup
+reload_config()

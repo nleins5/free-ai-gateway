@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #0D0D12;    /* Obsidian */
+    --accent: #C9A84C;     /* Champagne */
+    --organic: #2E4036;    /* Moss */
+    --clay: #CC5833;       /* Clay */
+    --bg-light: #FAF8F5;   /* Ivory */
+    --text-dark: #1A1A1A;
+    --text-ghost: rgba(250, 248, 245, 0.6);
+    --border-glass: rgba(255, 255, 255, 0.08);
+  }
+
+  body {
+    @apply bg-[var(--primary)] text-[var(--bg-light)] antialiased selection:bg-[var(--accent)] selection:text-[var(--primary)];
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.04em;
+    @apply font-extrabold;
+  }
+
+  .font-drama {
+    font-family: 'Playfair Display', serif;
+    @apply italic;
+  }
+
+  .font-organic {
+    font-family: 'Cormorant Garamond', serif;
+    @apply italic;
+  }
+
+  .font-outfit {
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .data-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .data-mono-alt {
+    font-family: 'Space Mono', monospace;
+  }
+}
+
+@layer components {
+  .noise-overlay {
+    @apply fixed inset-0 pointer-events-none z-[9999] opacity-[0.05];
+  }
+
+  .glass {
+    @apply bg-white/5 border border-white/10;
+    -webkit-backdrop-filter: blur(40px);
+    backdrop-filter: blur(40px);
+  }
+
+  .rounded-premium {
+    @apply rounded-[2.5rem];
+  }
+
+  .magnetic-btn {
+    @apply relative overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)];
+  }
+
+  .magnetic-btn:hover {
+    @apply scale-[1.03];
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-300 ease-out hover:-translate-y-1;
+  }
+
+  .stack-card {
+    @apply sticky top-[10vh] h-[80vh] w-full rounded-premium overflow-hidden transition-all duration-500;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[var(--primary)];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-[var(--accent)];
+}
+
+/* GSAP Animations Utilities */
+.fade-up {
+  @apply opacity-0 translate-y-10;
+}
+
+.mask-reveal {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}

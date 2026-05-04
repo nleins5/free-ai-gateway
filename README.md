@@ -1126,3 +1126,136 @@ curl http://localhost:8000/v1/rag/fine_tune/chat \
     "include_sources": true
   }'
 ```
+
+---
+
+### 12) Production Gateway với LiteLLM + Auto-Fallback
+
+Khi cần gateway production-grade, dùng LiteLLM làm proxy trung gian. Toàn bộ app chỉ gọi **1 endpoint duy nhất**, LiteLLM tự xử lý routing + fallback nội bộ.
+
+**File cấu hình `/etc/litellm/config.yaml`:**
+
+```yaml
+router:
+  model_list:
+    - name: openrouter
+      model: openrouter/llama-3-70b
+      api_base: https://openrouter.ai/api/v1
+      api_key: OPENROUTER_KEY
+      weight: 4          # Ưu tiên cao nhất
+      timeout: 10
+    - name: groq
+      model: groq/llama3-8b
+      api_base: https://api.groq.com/openai/v1
+      api_key: GROQ_KEY
+      weight: 3
+      timeout: 10
+    - name: xai
+      model: grok-4.1-fast
+      api_base: https://api.x.ai/v1
+      api_key: XAI_KEY
+      weight: 1
+      cost_per_1k_tokens: 0.0002  # để tracking
+
+litellm_settings:
+  retries: 2
+  retry_policy: exponential
+  fallbacks:
+    - openrouter
+    - groq
+    - xai
+  track_costs: true
+  log_requests: true
+```
+
+**Router logic (LiteLLM tự xử lý):**
+1. Gửi request đến **openrouter** (weight cao nhất).
+2. Nếu lỗi 429 (rate limit) hoặc 5xx → tự động chuyển sang **groq**.
+3. Nếu groq cũng lỗi → rớt xuống **xai** (Grok 4.1 Fast).
+4. Ghi log chi tiết: chi phí, số tokens, thời gian phản hồi.
+
+---
+
+### 13) App production gọi Gateway
+
+Toàn bộ ứng dụng chỉ cần gọi 1 endpoint chuẩn OpenAI:
+
+```bash
+POST https://llm-gateway.mycompany.com/v1/chat/completions
+
+{
+  "model": "auto",
+  "messages": [
+    {"role": "user", "content": "Tóm tắt file báo cáo này giúp tôi"}
+  ]
+}
+```
+
+LiteLLM tự route nội bộ theo weight + fallback. Khi thêm provider mới (Fireworks, Together…), chỉ sửa `config.yaml` rồi reload container — **không đụng mã nguồn app**.
+
+---
+
+### 14) Tracking cost & request với Langfuse (self-host miễn phí)
+
+**Cài Langfuse (Docker):**
+
+```bash
+docker run -d -p 3000:3000 langfuse/langfuse
+```
+
+**Thêm vào `config.yaml`:**
+
+```yaml
+integrations:
+  langfuse:
+    api_key: LANGFUSE_KEY
+    endpoint: http://localhost:3000/api
+```
+
+**Mỗi request qua Gateway đều được log:**
+- Tổng token / request
+- Cost theo `cost_per_1k_tokens`
+- Model sử dụng (để audit hoặc tối ưu router)
+
+**Dashboard realtime hiển thị:**
+- 💰 Tổng chi phí theo ngày
+- 🔄 Tỉ lệ fallback (bao nhiêu request gặp lỗi 429)
+- ⚖️ Load mỗi provider
+- 📈 Token throughput (TPM, RPM)
+
+---
+
+### 15) Mở rộng: thêm provider
+
+Chỉ cần thêm 1 block mới vào `model_list`, set weight:
+
+```yaml
+- name: together
+  model: together/llama-70b
+  api_base: https://api.together.xyz/v1
+  api_key: TOGETHER_KEY
+  weight: 2
+```
+
+Reload container → provider mới lập tức tham gia vào pool routing.
+
+---
+
+### 16) Tách task theo loại (tag-based routing)
+
+LiteLLM hỗ trợ route theo `tag` trong metadata, giúp mapping task → model tối ưu:
+
+| Tag | Route đến | Lý do |
+|-----|-----------|-------|
+| `EASY` | Groq / OpenRouter | Chat đơn giản, classify, rewrite — nhanh và rẻ |
+| `HARD` | xAI / Claude / GPT | Code, reasoning, phân tích phức tạp — cần chất lượng |
+
+```bash
+curl https://llm-gateway.mycompany.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "Giải thích kiến trúc microservices"}],
+    "metadata": {"tag": "HARD"}
+  }'
+```

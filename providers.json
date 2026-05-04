@@ -1,0 +1,45 @@
+{
+  "_comment": "Hot-reload provider config. Edit this file and call POST /admin/reload-providers to apply without restart.",
+  "provider_chain": [
+    "groq", "gemini", "github", "cerebras", "huggingface",
+    "sambanova", "cloudflare", "openrouter", "xai", "together", "claude", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom", "freetheai"
+  ],
+  "task_tiers": {
+    "general":   ["groq", "gemini", "github", "huggingface", "cloudflare"],
+    "chat_faq":  ["groq", "gemini", "cloudflare", "huggingface"],
+    "summarize": ["groq", "cerebras", "gemini", "cloudflare"],
+    "rewrite":   ["gemini", "groq", "cloudflare"],
+    "classify":  ["cloudflare", "groq", "gemini"],
+    "translate": ["gemini", "groq", "cloudflare"],
+    "code":      ["github", "groq", "cerebras", "huggingface", "xai", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom"],
+    "reasoning": ["groq", "gemini", "github", "xai", "together", "claude", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom"],
+    "rag":       ["groq", "gemini", "github", "huggingface", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom"],
+    "vision":    ["github", "gemini"],
+    "image":     ["cloudflare", "huggingface", "freetheai"],
+    "gemma":     ["groq", "gemini", "openrouter", "huggingface", "cloudflare"]
+  },
+  "provider_weights": {
+    "groq": 3,
+    "gemini": 3,
+    "github": 2,
+    "cerebras": 2,
+    "huggingface": 1,
+    "sambanova": 1,
+    "cloudflare": 2,
+    "openrouter": 1,
+    "xai": 1,
+    "together": 1,
+    "claude": 1,
+    "nvidia": 2,
+    "nvidia_33": 2,
+    "nvidia_77": 2,
+    "nvidia_custom": 2,
+    "freetheai": 1
+  },
+  "budget": {
+    "daily_limit_usd": 0,
+    "alert_threshold_usd": 0,
+    "_comment": "0 = unlimited. Set a value to auto-block requests when exceeded."
+  },
+  "updated_at": "2026-05-03T21:00:00Z"
+}
