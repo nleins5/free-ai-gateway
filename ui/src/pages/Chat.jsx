@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Mic, Sparkles, Code2, Image as ImageIcon, Search, Settings, ArrowLeft, Zap, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || (window.location.hostname === 'localhost' ? 'http://localhost:8000' : '');
 
 const ChatMessage = ({ msg }) => {
     const isAi = msg.role === 'assistant';
