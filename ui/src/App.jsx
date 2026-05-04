@@ -9,10 +9,18 @@ import {
   Cpu, 
   Clock
 } from 'lucide-react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Chat from './pages/Chat';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
+
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -103,14 +111,15 @@ const Navbar = () => {
             {item}
           </a>
         ))}
-        <Link to="/admin" className="hover:text-[var(--accent)] transition-colors opacity-80 hover:opacity-100">
+      </div>
+      <div className="flex items-center gap-4">
+        <Link to="/admin" className="text-sm font-medium hover:text-[var(--accent)] transition-colors opacity-80 hover:opacity-100">
           Admin
         </Link>
+        <MagneticButton variant="glass" className="py-2 px-4 md:px-6 text-[10px] md:text-xs" to="/playground">
+          LAUNCH GATEWAY
+        </MagneticButton>
       </div>
-
-      <MagneticButton variant="glass" className="py-2 px-6 text-xs" to="/playground">
-        LAUNCH GATEWAY
-      </MagneticButton>
     </nav>
   );
 };
@@ -659,6 +668,7 @@ const LandingPage = () => (
 const App = () => {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/playground" element={<Chat />} />
