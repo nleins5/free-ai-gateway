@@ -34,7 +34,6 @@ htmlcov/
 .coverage
 
 # Build artifacts
-ui/dist/
 node_modules/
 
 # OS
