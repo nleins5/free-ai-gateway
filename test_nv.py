@@ -1,8 +1,9 @@
+import os
 import requests
 
 url = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell"
 headers = {
-    "Authorization": "Bearer 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",
+    "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY', 'YOUR_NVIDIA_API_KEY')}",
     "Accept": "application/json",
     "Content-Type": "application/json",
 }
