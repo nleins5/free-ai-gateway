@@ -141,7 +141,7 @@ const Admin = () => {
 
       if (statsRes.status === 403 || providersRes.status === 403) {
         setIsAuthenticated(false);
-        setAuthError('Invalid system protocol secret.');
+        setAuthError('Invalid system protocol secret (Access Denied).');
         localStorage.removeItem('adminSecret');
         setLoading(false);
         return;
