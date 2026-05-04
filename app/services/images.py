@@ -9,59 +9,18 @@ from app.config import settings
 # Regex for cleaning prompts
 _IMAGE_COMMAND_RE = re.compile(r"^\s*(/image|draw|generate|create|imagine)\s*", re.I)
 
-_VI_IMAGE_PHRASE_MAP = [
-    ("con ho", "a tiger"),
-    ("con meo", "a cat"),
-    ("phong canh", "landscape"),
-    ("rung", "forest"),
-    ("nui", "mountain"),
-    ("bien", "ocean"),
-    ("thanh pho", "city"),
-    ("tuong lai", "futuristic"),
-    ("cyberpunk", "cyberpunk"),
-    ("chan thuc", "realistic"),
-    ("sac net", "sharp"),
-    ("dep", "beautiful"),
-]
-
-def _strip_accents(s: str) -> str:
-    import unicodedata
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s)
-        if unicodedata.category(c) != "Mn"
-    )
-
-def _translate_vi_image_terms(prompt: str) -> str:
-    translated = _strip_accents(prompt).lower()
-    translated = re.sub(r"[^a-z0-9\s,.-]", " ", translated)
-    translated = re.sub(r"\s+", " ", translated).strip()
-    if not translated:
-        return prompt
-
-    for vi_phrase, en_phrase in sorted(_VI_IMAGE_PHRASE_MAP, key=lambda item: len(item[0]), reverse=True):
-        translated = re.sub(rf"\b{re.escape(vi_phrase)}\b", en_phrase, translated)
-
-    translated = re.sub(r"\s+", " ", translated).strip(" ,.-")
-    return translated or prompt
-
 def prepare_image_prompt(prompt: str) -> str:
     clean_prompt = re.sub(r"\s+", " ", prompt).strip()
     subject = _IMAGE_COMMAND_RE.sub("", clean_prompt).strip(" ,.-:")
     subject = subject or clean_prompt
-    translated_subject = _translate_vi_image_terms(subject)
 
-    word_count = len(re.findall(r"\w+", translated_subject))
+    # For modern models like FLUX, passing the prompt as-is works best.
+    # We add a mild enhancement for very short prompts.
+    word_count = len(re.findall(r"\w+", subject))
     if word_count <= 4:
-        compiled = (
-            f"A clear high-quality image of {translated_subject}, centered main subject, "
-            "simple clean background, visually faithful to the prompt, no text, no watermark, "
-            "no unrelated objects."
-        )
+        compiled = f"{subject}, high quality, detailed, visually appealing"
     else:
-        compiled = (
-            f"{translated_subject}. Make the main subject obvious and visually faithful to the prompt. "
-            "No text, no watermark, no unrelated objects."
-        )
+        compiled = subject
 
     return compiled[:900]
 
@@ -74,6 +33,11 @@ class ImageService:
         compiled_prompt = prepare_image_prompt(clean_prompt)
         
         try:
+            # Try NVIDIA
+            nv_image = await self._image_from_nvidia(compiled_prompt)
+            if nv_image:
+                return nv_image
+
             # Try Cloudflare
             cf_image = await self._image_from_cloudflare(compiled_prompt)
             if cf_image:
@@ -97,6 +61,41 @@ class ImageService:
             "translated_prompt": compiled_prompt,
             "data": [{"url": source_url}],
         }
+
+    async def _image_from_nvidia(self, prompt: str) -> Optional[Dict[str, Any]]:
+        nv_token = os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_API_KEY_CUSTOM")
+        if not nv_token:
+            return None
+
+        url = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev"
+        seed = random.randint(1, 999999)
+        payload = {
+            "text_prompts": [{"text": prompt}],
+            "seed": seed,
+            "steps": 25
+        }
+        
+        try:
+            response = await self.http_client.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {nv_token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                json=payload
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if "artifacts" in data and len(data["artifacts"]) > 0:
+                    img_b64 = data["artifacts"][0]["base64"]
+                    return {
+                        "provider": "NVIDIA (FLUX.1-dev VIP)",
+                        "data": [{"url": f"data:image/jpeg;base64,{img_b64}"}]
+                    }
+        except Exception:
+            pass
+        return None
 
     async def _image_from_cloudflare(self, prompt: str) -> Optional[Dict[str, Any]]:
         cf_account = os.getenv("CLOUDFLARE_ACCOUNT_ID")

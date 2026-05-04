@@ -7,31 +7,17 @@ import {
   Zap, 
   Activity, 
   Cpu, 
-  Send,
-  Image as ImageIcon,
-  Loader2,
-  MessageSquare,
   Clock
 } from 'lucide-react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import Chat from './pages/Chat';
+import Login from './pages/Login';
+import Admin from './pages/Admin';
 
 gsap.registerPlugin(ScrollTrigger);
 
-// --- UTILS ---
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
-
 // --- SHARED COMPONENTS ---
 
-const NoiseOverlay = () => (
-  <div className="noise-overlay">
-    <svg width="100%" height="100%">
-      <filter id="noise">
-        <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
-      </filter>
-      <rect width="100%" height="100%" filter="url(#noise)"/>
-    </svg>
-  </div>
-);
 
 const MagneticButton = ({ children, className = "", onClick, to, variant = "primary" }) => {
   const btnRef = useRef(null);
@@ -112,11 +98,14 @@ const Navbar = () => {
       </Link>
       
       <div className="hidden md:flex items-center gap-8 text-sm font-medium tracking-wide">
-        {['Features', 'Protocol', 'Manifesto', 'Admin'].map((item) => (
+        {['Features', 'Protocol', 'Manifesto'].map((item) => (
           <a key={item} href={`#${item.toLowerCase()}`} className="hover:text-[var(--accent)] transition-colors opacity-80 hover:opacity-100">
             {item}
           </a>
         ))}
+        <Link to="/admin" className="hover:text-[var(--accent)] transition-colors opacity-80 hover:opacity-100">
+          Admin
+        </Link>
       </div>
 
       <MagneticButton variant="glass" className="py-2 px-6 text-xs" to="/playground">
@@ -127,6 +116,26 @@ const Navbar = () => {
 };
 
 // --- HERO SECTION ---
+
+const CinematicHeroBackground = () => (
+  <div className="absolute inset-0 z-0 bg-[#0D0D12] overflow-hidden">
+    {/* Cinematic Video Background */}
+    <video 
+      autoPlay 
+      loop 
+      muted 
+      playsInline 
+      className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen"
+    >
+      <source src="https://videos.pexels.com/video-files/3129595/3129595-uhd_2560_1440_30fps.mp4" type="video/mp4" />
+    </video>
+    
+    {/* Vignette Overlays for readability and fading edges */}
+    <div className="absolute inset-0 bg-gradient-to-t from-[#0D0D12] via-[#0D0D12]/40 to-transparent opacity-90"></div>
+    <div className="absolute inset-0 bg-gradient-to-r from-[#0D0D12] via-transparent to-transparent opacity-80"></div>
+    <div className="absolute inset-0 bg-gradient-to-b from-[#0D0D12]/60 via-transparent to-transparent opacity-60"></div>
+  </div>
+);
 
 const Hero = () => {
   const heroRef = useRef(null);
@@ -147,12 +156,7 @@ const Hero = () => {
   return (
     <section ref={heroRef} className="relative h-[100dvh] w-full overflow-hidden flex flex-col justify-end p-8 md:p-20">
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2070&auto=format&fit=crop" 
-          alt="Organic Textures" 
-          className="w-full h-full object-cover scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--primary)] via-[var(--primary)]/60 to-transparent"></div>
+        <CinematicHeroBackground />
       </div>
 
       <div className="hero-content relative z-10 max-w-4xl">
@@ -385,6 +389,106 @@ const Philosophy = () => {
 
 // --- PROTOCOL (Stacking Cards) ---
 
+const RotatingMotif = () => (
+  <div className="w-full h-full flex items-center justify-end md:justify-center overflow-hidden opacity-50 md:pr-24">
+    <svg viewBox="0 0 800 800" className="w-[800px] h-[800px] md:w-[1200px] md:h-[1200px] animate-[spin_40s_linear_infinite] opacity-60">
+      <defs>
+        <radialGradient id="grad1" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx="400" cy="400" r="300" stroke="var(--accent)" strokeWidth="1" fill="url(#grad1)" strokeDasharray="4 12" />
+      <circle cx="400" cy="400" r="250" stroke="var(--accent)" strokeWidth="0.5" fill="none" className="animate-[spin_20s_linear_infinite_reverse]" style={{ transformOrigin: 'center' }} />
+      <circle cx="400" cy="400" r="200" stroke="var(--accent)" strokeWidth="2" fill="none" strokeDasharray="1 6" strokeLinecap="round" />
+      <path d="M 100 400 L 700 400 M 400 100 L 400 700" stroke="var(--accent)" strokeWidth="0.5" className="opacity-30" />
+      <g className="animate-[spin_60s_linear_infinite]" style={{ transformOrigin: 'center' }}>
+        <polygon points="400,100 660,250 660,550 400,700 140,550 140,250" stroke="var(--accent)" strokeWidth="1" fill="none" opacity="0.5" />
+        <polygon points="400,150 616,275 616,525 400,650 184,525 184,275" stroke="var(--accent)" strokeWidth="0.5" fill="none" opacity="0.3" className="animate-[spin_30s_linear_infinite_reverse]" style={{ transformOrigin: 'center' }} />
+      </g>
+    </svg>
+  </div>
+);
+
+const LaserGrid = () => (
+  <div className="w-full h-full relative overflow-hidden opacity-50 bg-[#0a0a0f]">
+    <div 
+      className="absolute inset-0 opacity-20"
+      style={{
+        backgroundImage: 'radial-gradient(var(--accent) 1px, transparent 1px)',
+        backgroundSize: '40px 40px'
+      }}
+    />
+    <div 
+      className="absolute left-0 w-full h-[2px] bg-[var(--accent)] shadow-[0_0_15px_var(--accent)] opacity-80"
+      style={{
+        animation: 'scan-vertical 4s ease-in-out infinite alternate'
+      }}
+    />
+    <div 
+      className="absolute inset-0 opacity-10"
+      style={{
+        background: 'linear-gradient(45deg, transparent 40%, var(--accent) 45%, transparent 50%)',
+        backgroundSize: '200% 200%',
+        animation: 'shimmer 8s linear infinite'
+      }}
+    />
+    <style dangerouslySetInnerHTML={{__html: `
+      @keyframes scan-vertical {
+        0% { top: -10%; }
+        100% { top: 110%; }
+      }
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    `}} />
+  </div>
+);
+
+const PulsingWaveform = () => (
+  <div className="w-full h-full flex items-center justify-end overflow-hidden opacity-60">
+    <svg viewBox="0 0 1000 300" className="w-full h-[300px] md:h-[600px] scale-150 md:scale-100">
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <line x1="0" y1="150" x2="1000" y2="150" stroke="var(--accent)" strokeWidth="1" opacity="0.3" strokeDasharray="5 5" />
+      <path
+        d="M 0 150 L 200 150 L 250 50 L 300 250 L 350 100 L 400 200 L 450 150 L 600 150 L 650 20 L 700 280 L 750 150 L 1000 150"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        filter="url(#glow)"
+        style={{
+          strokeDasharray: '1500',
+          animation: 'draw-path 3s linear infinite'
+        }}
+      />
+      <path
+        d="M 0 150 L 200 150 L 250 50 L 300 250 L 350 100 L 400 200 L 450 150 L 600 150 L 650 20 L 700 280 L 750 150 L 1000 150"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="1"
+        opacity="0.3"
+      />
+    </svg>
+    <style dangerouslySetInnerHTML={{__html: `
+      @keyframes draw-path {
+        0% { stroke-dashoffset: 1500; }
+        100% { stroke-dashoffset: 0; }
+      }
+    `}} />
+  </div>
+);
+
 const Protocol = () => {
   const sectionRef = useRef(null);
 
@@ -421,19 +525,19 @@ const Protocol = () => {
       num: "01",
       title: "Discovery Protocol",
       desc: "Automatically map your organizational data into neural vectors with high-precision RAG stores.",
-      img: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1964&auto=format&fit=crop"
+      Visual: RotatingMotif
     },
     {
       num: "02",
       title: "Provider Arbitration",
       desc: "Real-time auctioning of tasks to the provider that offers the best balance of accuracy and speed.",
-      img: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop"
+      Visual: LaserGrid
     },
     {
       num: "03",
       title: "Continuous Synthesis",
       desc: "Unified output generation that blends results from multiple models into a single, cohesive intelligence stream.",
-      img: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1974&auto=format&fit=crop"
+      Visual: PulsingWaveform
     }
   ];
 
@@ -445,8 +549,8 @@ const Protocol = () => {
           {steps.map((step, i) => (
             <div key={i} className="protocol-card relative w-full h-[80vh] rounded-[3rem] overflow-hidden flex items-center bg-[var(--primary)] border border-white/10">
               <div className="absolute inset-0 z-0">
-                <img src={step.img} alt={step.title} className="w-full h-full object-cover opacity-40 scale-110" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] via-[var(--primary)]/80 to-transparent"></div>
+                <step.Visual />
+                <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] via-[var(--primary)]/90 to-transparent"></div>
               </div>
               
               <div className="relative z-10 p-12 md:p-24 max-w-2xl">
@@ -476,102 +580,7 @@ const Protocol = () => {
   );
 };
 
-// --- PLAYGROUND (The Interactive Element) ---
-
-const Playground = () => {
-  const [activeTab, setActiveTab] = useState('chat');
-  const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleAction = async () => {
-    if (!prompt) return;
-    setLoading(true);
-    try {
-      if (activeTab === 'chat') {
-        const res = await fetch(`${API_BASE}/v1/chat/unified`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: prompt })
-        });
-        const data = await res.json();
-        setResponse(data.answer);
-      } else {
-        const res = await fetch(`${API_BASE}/v1/images/generations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
-        });
-        const data = await res.json();
-        setResponse(data.data[0].url);
-      }
-    } catch {
-      setResponse("Error connecting to neural gateway.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <section className="min-h-screen pt-40 pb-20 px-8 md:px-20 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-12">
-        <div className="text-center">
-          <h2 className="text-5xl md:text-7xl mb-6">Neural Workbench</h2>
-          <p className="text-[var(--bg-light)]/40 max-w-2xl mx-auto">
-            Directly interface with the Aether Protocol. Switch between semantic reasoning and visual synthesis.
-          </p>
-        </div>
-
-        <div className="glass rounded-[3rem] p-4 md:p-8 flex flex-col gap-8 shadow-3xl">
-          <div className="flex justify-center gap-4">
-            <button 
-              onClick={() => setActiveTab('chat')}
-              className={`px-8 py-3 rounded-full transition-all flex items-center gap-2 ${activeTab === 'chat' ? "bg-[var(--accent)] text-[var(--primary)] font-bold" : "hover:bg-white/5"}`}
-            >
-              <MessageSquare size={18} /> Chat Interface
-            </button>
-            <button 
-              onClick={() => setActiveTab('image')}
-              className={`px-8 py-3 rounded-full transition-all flex items-center gap-2 ${activeTab === 'image' ? "bg-[var(--accent)] text-[var(--primary)] font-bold" : "hover:bg-white/5"}`}
-            >
-              <ImageIcon size={18} /> Visual Synthesis
-            </button>
-          </div>
-
-          <div className="relative">
-            <textarea 
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={activeTab === 'chat' ? "Ask the unified intelligence..." : "Describe a visual concept..."}
-              className="w-full h-32 md:h-48 bg-black/40 rounded-[2rem] p-8 text-xl font-outfit border border-white/10 focus:border-[var(--accent)] focus:outline-none transition-all placeholder:opacity-20 resize-none"
-            />
-            <button 
-              onClick={handleAction}
-              disabled={loading}
-              className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-[var(--accent)] text-[var(--primary)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-xl disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : <Send size={24} />}
-            </button>
-          </div>
-
-          {response && (
-            <div className="p-8 bg-white/5 rounded-[2rem] border border-white/10 animate-fade-in overflow-hidden">
-               {activeTab === 'chat' ? (
-                 <div className="prose prose-invert max-w-none text-lg leading-relaxed opacity-80 whitespace-pre-wrap">
-                   {response}
-                 </div>
-               ) : (
-                 <img src={response} alt="Generated" className="w-full h-auto rounded-xl shadow-2xl" />
-               )}
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-// --- FOOTER ---
+// --- PLAYGROUND MOVED TO PAGES/CHAT.JSX ---
 
 const Footer = () => (
   <footer className="bg-black rounded-t-[4rem] px-8 md:px-20 py-24 mt-20">
@@ -624,38 +633,38 @@ const Footer = () => (
 // --- MAIN APP ---
 
 const LandingPage = () => (
-  <main>
-    <Hero />
-    <Features />
-    <Philosophy />
-    <Protocol />
-    <section className="py-20 text-center bg-[var(--primary)]">
-       <h2 className="text-4xl md:text-6xl mb-12">Join the Waitlist.</h2>
-       <div className="max-w-xl mx-auto px-8">
-          <div className="relative group">
-             <input type="email" placeholder="Enter your email" className="w-full bg-white/5 border border-white/10 rounded-full px-8 py-5 focus:outline-none focus:border-[var(--accent)] transition-all" />
-             <button className="absolute right-2 top-2 bottom-2 bg-[var(--accent)] text-[var(--primary)] px-8 rounded-full font-bold hover:scale-105 active:scale-95 transition-all">
-                Submit
-             </button>
-          </div>
-       </div>
-    </section>
-  </main>
+  <div className="relative overflow-x-hidden">
+    <Navbar />
+    <main>
+      <Hero />
+      <Features />
+      <Philosophy />
+      <Protocol />
+      <section className="py-20 text-center bg-[var(--primary)]">
+         <h2 className="text-4xl md:text-6xl mb-12">Join the Waitlist.</h2>
+         <div className="max-w-xl mx-auto px-8">
+            <div className="relative group">
+               <input type="email" placeholder="Enter your email" className="w-full bg-white/5 border border-white/10 rounded-full px-8 py-5 focus:outline-none focus:border-[var(--accent)] transition-all" />
+               <button className="absolute right-2 top-2 bottom-2 bg-[var(--accent)] text-[var(--primary)] px-8 rounded-full font-bold hover:scale-105 active:scale-95 transition-all">
+                  Submit
+               </button>
+            </div>
+         </div>
+      </section>
+    </main>
+    <Footer />
+  </div>
 );
 
 const App = () => {
   return (
     <BrowserRouter>
-      <div className="relative overflow-x-hidden">
-        <NoiseOverlay />
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/playground" element={<Playground />} />
-          {/* Admin and other routes would go here */}
-        </Routes>
-        <Footer />
-      </div>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/playground" element={<Chat />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={<Admin />} />
+      </Routes>
     </BrowserRouter>
   );
 };

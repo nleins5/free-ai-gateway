@@ -2,6 +2,7 @@ import os
 import json
 from typing import Any, Dict, List, Tuple
 from dotenv import load_dotenv
+import aiofiles
 
 load_dotenv()
 
@@ -77,19 +78,38 @@ class Settings:
     def provider_cooldown_s(self) -> float:
         return PROVIDER_COOLDOWN_S
 
+    @property
+    def groq_api_key(self) -> str | None:
+        return os.getenv("GROQ_API_KEY")
+
 settings = Settings()
 
-def reload_config():
-    """Reload settings from providers.json if it exists."""
+def reload_config_sync():
+    """Synchronous fallback to load settings from providers.json on startup."""
     path = PROVIDERS_JSON_PATH
     if not os.path.isfile(path):
         return
     try:
         with open(path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+        _apply_config(cfg)
     except Exception:
+        pass
+
+async def reload_config():
+    """Reload settings from providers.json if it exists."""
+    path = PROVIDERS_JSON_PATH
+    if not os.path.isfile(path):
         return
-    
+    try:
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            content = await f.read()
+            cfg = json.loads(content)
+        _apply_config(cfg)
+    except Exception:
+        pass
+
+def _apply_config(cfg):
     if not isinstance(cfg, dict):
         return
 
@@ -111,4 +131,4 @@ def reload_config():
         settings.budget_daily_limit_usd = float(budget.get("daily_limit_usd", 0))
 
 # Load on startup
-reload_config()
+reload_config_sync()

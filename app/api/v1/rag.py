@@ -21,7 +21,7 @@ async def search_documents(
     rag_svc: RAGService = Depends(get_rag_service)
 ):
     """Search for relevant documents."""
-    results = rag_svc.search(req.query, top_k=req.top_k)
+    results = rag_svc.search(req.query, top_k=req.top_k or 4)
     return {"results": results}
 
 @router.post("/chat")
@@ -32,7 +32,7 @@ async def rag_chat(
 ):
     """Perform a chat completion augmented with RAG context."""
     # 1. Search for context
-    context_docs = rag_svc.search(req.query, top_k=req.top_k)
+    context_docs = rag_svc.search(req.query, top_k=req.top_k or 4)
     context_str = "\n\n".join([d["content"] for d in context_docs])
     
     # 2. Build messages

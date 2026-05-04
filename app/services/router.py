@@ -11,11 +11,12 @@ from app.config import (
     ROUTING_MODE
 )
 from app.core.providers import PROVIDER_REGISTRY, Provider
-from app.core.state import state_store
+from app.core.state import StateStore
 
 class RouterService:
-    def __init__(self):
+    def __init__(self, state_store: StateStore):
         self._clients: Dict[str, AsyncOpenAI] = {}
+        self.state_store = state_store
 
     def get_client(self, provider: Provider) -> AsyncOpenAI:
         if provider.key not in self._clients:
@@ -67,7 +68,7 @@ class RouterService:
         available = []
         for key in active_keys:
             p = PROVIDER_REGISTRY.get(key)
-            if p and not state_store.is_on_cooldown(key):
+            if p and not self.state_store.is_on_cooldown(key):
                 available.append(p)
         
         if not available:
@@ -78,11 +79,11 @@ class RouterService:
             scored = []
             for p in available:
                 base_w = settings.dynamic_weights.get(p.key, 100)
-                scored.append((state_store.get_effective_weight(p.key, base_w), p))
+                scored.append((self.state_store.get_effective_weight(p.key, base_w), p))
             scored.sort(key=lambda x: x[0], reverse=True)
             return [x[1] for x in scored]
         elif ROUTING_MODE == "round_robin":
-            idx = state_store.increment_rr() % len(available)
+            idx = self.state_store.increment_rr() % len(available)
             return available[idx:] + available[:idx]
         else:
             # Default sequence
@@ -91,24 +92,38 @@ class RouterService:
     async def chat_with_failover(
         self,
         messages: List[Dict[str, Any]],
+        user_id: Optional[str] = None,
         model_override: Optional[str] = None,
         temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         task: Optional[str] = "general",
     ) -> Tuple[Any, Dict[str, Any]]:
         
-        if state_store.get_total_cost() >= settings.budget_daily_limit_usd > 0:
+        if self.state_store.get_total_cost() >= settings.budget_daily_limit_usd > 0:
             raise HTTPException(
                 status_code=429,
                 detail=f"Daily budget limit of ${settings.budget_daily_limit_usd:.2f} exceeded."
             )
 
-        chain = settings.task_tiers.get(task, settings.provider_chain)
+        if user_id:
+            prompt_count = self.state_store.get_user_prompts(user_id)
+            if prompt_count >= 9999:
+                raise HTTPException(
+                    status_code=402,
+                    detail={"message": "Out of credits. Please subscribe."}
+                )
+            elif prompt_count < 9990:
+                task = "vip"
+            else:
+                task = "general"
+            self.state_store.increment_user_prompt(user_id)
+
+        chain = settings.task_tiers.get(task or "general", settings.provider_chain)
         providers = self._get_ordered_providers(chain)
         
         if not providers:
             # Fallback to entire registry if everything is on cooldown or invalid
-            providers = [p for p in PROVIDER_REGISTRY.values() if not state_store.is_on_cooldown(p.key)]
+            providers = [p for p in PROVIDER_REGISTRY.values() if not self.state_store.is_on_cooldown(p.key)]
             if not providers:
                 raise HTTPException(status_code=502, detail="All providers are currently on cooldown or inactive.")
 
@@ -127,19 +142,19 @@ class RouterService:
 
             last_error = None
             for attempt in range(MAX_RETRIES_PER_PROVIDER + 1):
-                state_store.mark_attempt(provider.key)
+                self.state_store.mark_attempt(provider.key)
                 start_time = time.perf_counter()
                 try:
-                    response = await client.chat.completions.create(**payload)
+                    response = await client.chat.completions.create(**payload)  # type: ignore
                     latency = (time.perf_counter() - start_time) * 1000.0
-                    state_store.record_latency(provider.key, latency)
-                    state_store.mark_success(provider.key)
+                    self.state_store.record_latency(provider.key, latency)
+                    self.state_store.mark_success(provider.key)
                     
                     # Usage tracking
                     usage = getattr(response, "usage", None)
                     t_in = getattr(usage, "prompt_tokens", 0) if usage else 0
                     t_out = getattr(usage, "completion_tokens", 0) if usage else 0
-                    state_store.record_usage(provider.key, t_in, t_out)
+                    self.state_store.record_usage(provider.key, t_in, t_out)
                     
                     meta = {
                         "provider": provider.key,
@@ -150,18 +165,17 @@ class RouterService:
                     return response, meta
                 except Exception as exc:
                     latency = (time.perf_counter() - start_time) * 1000.0
-                    state_store.record_latency(provider.key, latency)
+                    self.state_store.record_latency(provider.key, latency)
                     last_error = exc
                     if not self._is_retryable(exc):
                         break
             
             if last_error:
-                state_store.mark_failure(provider.key, str(last_error))
+                self.state_store.mark_failure(provider.key, str(last_error))
                 errors.append({"provider": provider.key, "error": str(last_error)})
 
         raise HTTPException(
             status_code=502,
             detail={"message": "All upstream providers failed", "errors": errors},
         )
-
-router_service = RouterService()
+# router_service removed, initialized in app.main

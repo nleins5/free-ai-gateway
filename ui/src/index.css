@@ -52,6 +52,7 @@
 @layer components {
   .noise-overlay {
     @apply fixed inset-0 pointer-events-none z-[9999] opacity-[0.05];
+    filter: url(#noiseFilter);
   }
 
   .glass {

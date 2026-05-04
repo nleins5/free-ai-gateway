@@ -1,6 +1,7 @@
 # 🚀 Hệ Thống AI Miễn Phí với Auto-Routing & Load Balancing
 
 ## 📋 Mục lục
+
 1. [Nguồn AI Models Miễn Phí](#nguồn-ai-models-miễn-phí)
 2. [Routing & Load Balancing Tools](#routing--load-balancing-tools)
 3. [Cách Kết Nối & Tự Động Xoay](#cách-kết-nối--tự-động-xoay)
@@ -11,9 +12,11 @@
 ## 🎯 Nguồn AI Models Miễn Phí
 
 ### 1️⃣ **Cloudflare Workers AI** ⭐⭐⭐⭐⭐
+
 **Free Tier:** 10,000 Neurons/day (reset 00:00 UTC)
 
 **Available Models:**
+
 - **LLMs:** Llama 3/3.1/4, Mistral 7B, Qwen 1.5/2.5, Hermes 2 Pro, Starling 7B, DeepSeek-R1
 - **Vision:** FLUX.2 [klein/dev], Leonardo Phoenix, Lucid Origin
 - **Audio:** Whisper, MeloTTS, Aura TTS
@@ -21,11 +24,13 @@
 - **Image Generation:** Stable Diffusion variants
 
 **Endpoint:**
+
 ```bash
 https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}
 ```
 
 **Setup:**
+
 ```bash
 # 1. Tạo Cloudflare account (free)
 # 2. Get Account ID từ dashboard
@@ -39,19 +44,22 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/
 
 **Pricing sau free tier:** $0.011/1,000 Neurons
 
-**Docs:** https://developers.cloudflare.com/workers-ai/
+**Docs:** <https://developers.cloudflare.com/workers-ai/>
 
 ---
 
 ### 2️⃣ **GitHub Models** ⭐⭐⭐⭐⭐
+
 **Free Tier:** Rate limits per model tier
 
 **Available Models:**
+
 - **Tier Low:** 15 req/min, 150 req/day (Llama 3.2, Phi-3)
 - **Tier Medium:** 10 req/min, 50 req/day (GPT-4o, Mistral Large)
 - **Tier High:** 10 req/min, 50 req/day (Claude Sonnet 4, GPT-4o, DeepSeek-R1, Grok 3)
 
 **Models List:**
+
 - AI21 Jamba 1.5 Large
 - Cohere Command R/R+ 08-2024
 - **DeepSeek-R1, DeepSeek-V3**
@@ -63,11 +71,13 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/
 - Anthropic Claude Sonnet 4
 
 **Endpoint:**
+
 ```bash
 https://models.github.ai/inference
 ```
 
 **Setup:**
+
 ```python
 from openai import OpenAI
 
@@ -83,34 +93,40 @@ response = client.chat.completions.create(
 ```
 
 **Tạo GitHub PAT:**
+
 1. GitHub Settings → Developer settings → Personal access tokens (Beta)
 2. Generate new token với quyền `models:read` / `models`
 3. Copy token
 
-**Docs:** https://docs.github.com/en/github-models
+**Docs:** <https://docs.github.com/en/github-models>
 
 ---
 
 ### 3️⃣ **FreeTheAI** ⭐⭐⭐⭐
+
 **Free Tier:** Rate limits per minute
 
 **Available Models:**
+
 - **Chat:** Kimi K2.6, DeepSeek-V3, Llama variants
 - **Image:** Grok Imagine (xai/grok-imagine-image)
 - **Video:** Grok Imagine Video (xai/grok-imagine-video)
 - **Audio/TTS:** Grok TTS (multiple voices)
 
 **Endpoint:**
+
 ```bash
 https://api.freetheai.xyz/v1
 ```
 
 **Setup:**
-1. Join Discord: https://discord.gg/freetheai
+
+1. Join Discord: <https://discord.gg/freetheai>
 2. Run `/signup` command
 3. Copy API key
 
 **Example:**
+
 ```bash
 curl https://api.freetheai.xyz/v1/chat/completions \
   -H "Authorization: Bearer YOUR_API_KEY" \
@@ -121,88 +137,101 @@ curl https://api.freetheai.xyz/v1/chat/completions \
   }'
 ```
 
-**Docs:** https://github.com/vibheksoni/free-ai
+**Docs:** <https://github.com/vibheksoni/free-ai>
 
 ---
 
 ### 4️⃣ **Groq API** ⭐⭐⭐⭐
+
 **Free Tier:** 14,400 requests/day, 30 req/min
 
 **Models:**
+
 - Llama 3.1/3.2/3.3 (8B, 70B, 405B)
 - Gemma 2 (9B, 27B)
 - Mixtral 8x7B
 - DeepSeek-R1
 
 **Endpoint:**
+
 ```bash
 https://api.groq.com/openai/v1
 ```
 
-**Docs:** https://console.groq.com/
+**Docs:** <https://console.groq.com/>
 
 ---
 
 ### 5️⃣ **HuggingFace Inference API** ⭐⭐⭐
+
 **Free Tier:** Rate limits vary by model
 
 **Models:** 100,000+ models (<10GB auto-available)
 
 **Endpoint:**
+
 ```bash
 https://api-inference.huggingface.co/models/{model_name}
 ```
 
-**Docs:** https://huggingface.co/docs/api-inference/
+**Docs:** <https://huggingface.co/docs/api-inference/>
 
 ---
 
 ### 6️⃣ **OpenRouter** ⭐⭐⭐⭐
+
 **Free Models:** 150+ free models across 20+ providers
 
 **Endpoint:**
+
 ```bash
 https://openrouter.ai/api/v1
 ```
 
 **Free Models Include:**
+
 - Google Gemini Flash (free)
 - Meta Llama (free tiers)
 - Mistral (free tiers)
 - Qwen, DeepSeek variants
 
-**Docs:** https://openrouter.ai/docs
+**Docs:** <https://openrouter.ai/docs>
 
 ---
 
 ### 7️⃣ **Cerebras Inference** ⭐⭐⭐⭐
+
 **Free Tier:** Generous limits
 
 **Models:**
+
 - Llama 3.1 (8B, 70B)
 - Llama 3.3 70B
 
 **Đặc điểm:** Cực kỳ nhanh (2000+ tokens/sec)
 
-**Docs:** https://cerebras.ai/
+**Docs:** <https://cerebras.ai/>
 
 ---
 
 ### 8️⃣ **Together AI** ⭐⭐⭐
+
 **Free Credits:** $25 signup credit
 
 **Models:** 50+ open-source models
 
-**Docs:** https://www.together.ai/
+**Docs:** <https://www.together.ai/>
 
 ---
 
 ## 🔄 Routing & Load Balancing Tools
 
 ### 1️⃣ **Bifrost** ⭐⭐⭐⭐⭐ (RECOMMENDED)
-**GitHub:** https://github.com/maximhq/bifrost
+
+**GitHub:** <https://github.com/maximhq/bifrost>
 
 **Features:**
+
 - ⚡ **50x faster than LiteLLM** (11 µs overhead @ 5K RPS)
 - 🔄 Automatic failover (<100ms)
 - ⚖️ Load balancing across multiple API keys
@@ -211,6 +240,7 @@ https://openrouter.ai/api/v1
 - 🆓 **Fully open-source, self-hosted**
 
 **Setup:**
+
 ```bash
 # NPM (quickest)
 npx -y @maximhq/bifrost
@@ -222,6 +252,7 @@ docker run -p 8080:8080 maximhq/bifrost
 ```
 
 **Config Example (bifrost.yaml):**
+
 ```yaml
 models:
   - name: gpt-4-auto
@@ -242,11 +273,12 @@ models:
         api_key: ${OPENROUTER_API_KEY}
         priority: 3
 
-    fallback_strategy: priority  # auto failover khi rate limit
+    fallback_strategy: priority # auto failover khi rate limit
     load_balancing: round-robin
 ```
 
 **Usage:**
+
 ```python
 from openai import OpenAI
 
@@ -265,9 +297,11 @@ response = client.chat.completions.create(
 ---
 
 ### 2️⃣ **Olla** ⭐⭐⭐⭐
-**GitHub:** https://github.com/thushan/olla
+
+**GitHub:** <https://github.com/thushan/olla>
 
 **Features:**
+
 - 🎯 Priority-based routing
 - 📌 Sticky sessions (KV-cache aware)
 - 💊 Health monitoring + circuit breakers
@@ -275,6 +309,7 @@ response = client.chat.completions.create(
 - 🔧 Self-healing model discovery
 
 **Setup:**
+
 ```bash
 # Download binary
 wget https://github.com/thushan/olla/releases/latest/download/olla-linux-amd64
@@ -285,6 +320,7 @@ chmod +x olla-linux-amd64
 ```
 
 **Config (olla.yaml):**
+
 ```yaml
 profiles:
   - name: free-llm-pool
@@ -309,15 +345,18 @@ profiles:
 ---
 
 ### 3️⃣ **AxonHub** ⭐⭐⭐⭐
-**GitHub:** https://github.com/looplj/axonhub
+
+**GitHub:** <https://github.com/looplj/axonhub>
 
 **Features:**
+
 - 🔄 Auto failover <100ms
 - 💰 Per-request cost tracking
 - 🎯 Fine-grained access control
 - 📊 End-to-end observability
 
 **Setup:**
+
 ```bash
 docker compose up -d
 # Web UI: http://localhost:3000
@@ -326,9 +365,11 @@ docker compose up -d
 ---
 
 ### 4️⃣ **LiteLLM Proxy** ⭐⭐⭐⭐⭐ (Most Popular)
-**GitHub:** https://github.com/BerriAI/litellm
+
+**GitHub:** <https://github.com/BerriAI/litellm>
 
 **Features:**
+
 - 🌐 Support 100+ LLM providers
 - ⚖️ Load balancing
 - 🔄 Fallbacks
@@ -336,6 +377,7 @@ docker compose up -d
 - 📊 Spend tracking
 
 **Setup:**
+
 ```bash
 pip install litellm[proxy]
 
@@ -370,9 +412,11 @@ litellm --config config.yaml
 ---
 
 ### 5️⃣ **Portkey Gateway** ⭐⭐⭐⭐
-**GitHub:** https://github.com/Portkey-AI/gateway
+
+**GitHub:** <https://github.com/Portkey-AI/gateway>
 
 **Features:**
+
 - 🚀 200+ LLMs support
 - 🛡️ 50+ AI Guardrails
 - ⚖️ Load balancing with weights
@@ -386,6 +430,7 @@ litellm --config config.yaml
 ### Phương Án 1: Bifrost (SIMPLEST) ⭐ RECOMMENDED
 
 **Architecture:**
+
 ```
 Your App → Bifrost Gateway → [Cloudflare, GitHub, Groq, OpenRouter] → Auto-rotate
 ```
@@ -482,6 +527,7 @@ npx -y @maximhq/bifrost --config bifrost.yaml
 ```
 
 **Usage in your app:**
+
 ```python
 from openai import OpenAI
 
@@ -498,6 +544,7 @@ response = client.chat.completions.create(
 ```
 
 **How Auto-Rotation Works:**
+
 1. Request hits Bifrost
 2. Routes to priority 1 provider (GitHub)
 3. If rate limit → automatic failover to priority 2 (OpenRouter)
@@ -686,6 +733,7 @@ print(response)
 ```
 
 **Chạy script:**
+
 ```bash
 python free_ai_router.py
 ```
@@ -694,19 +742,20 @@ python free_ai_router.py
 
 ## 📊 So Sánh Các Phương Án
 
-| Feature | Bifrost | LiteLLM | Custom Script | Olla |
-|---------|---------|---------|---------------|------|
-| **Setup Complexity** | ⭐⭐⭐⭐⭐ Easiest | ⭐⭐⭐ Medium | ⭐⭐ Complex | ⭐⭐⭐ Medium |
-| **Performance** | 50x faster | Baseline | Fastest | Very fast |
-| **Auto Failover** | ✅ <100ms | ✅ | ✅ (manual) | ✅ |
-| **Load Balancing** | ✅ Advanced | ✅ | ✅ (manual) | ✅ |
-| **Semantic Caching** | ✅ | ✅ | ❌ | ❌ |
-| **Web UI** | ✅ | ✅ | ❌ | ❌ |
-| **Cost Tracking** | ✅ | ✅ | ✅ (manual) | ❌ |
-| **Monitoring** | ✅ Prometheus | ✅ | ❌ | ✅ |
-| **Customization** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| Feature              | Bifrost            | LiteLLM       | Custom Script | Olla          |
+| -------------------- | ------------------ | ------------- | ------------- | ------------- |
+| **Setup Complexity** | ⭐⭐⭐⭐⭐ Easiest | ⭐⭐⭐ Medium | ⭐⭐ Complex  | ⭐⭐⭐ Medium |
+| **Performance**      | 50x faster         | Baseline      | Fastest       | Very fast     |
+| **Auto Failover**    | ✅ <100ms          | ✅            | ✅ (manual)   | ✅            |
+| **Load Balancing**   | ✅ Advanced        | ✅            | ✅ (manual)   | ✅            |
+| **Semantic Caching** | ✅                 | ✅            | ❌            | ❌            |
+| **Web UI**           | ✅                 | ✅            | ❌            | ❌            |
+| **Cost Tracking**    | ✅                 | ✅            | ✅ (manual)   | ❌            |
+| **Monitoring**       | ✅ Prometheus      | ✅            | ❌            | ✅            |
+| **Customization**    | ⭐⭐⭐             | ⭐⭐⭐⭐      | ⭐⭐⭐⭐⭐    | ⭐⭐⭐        |
 
 **Recommendation:**
+
 - **Production:** Bifrost (fastest + easiest)
 - **Max Features:** LiteLLM
 - **Full Control:** Custom Script
@@ -756,19 +805,22 @@ models:
 
 ## 🔧 Debugging & Monitoring
 
-### View Bifrost Logs:
+### View Bifrost Logs
+
 ```bash
 # Real-time monitoring
 curl http://localhost:8080/metrics
 ```
 
-### LiteLLM Dashboard:
+### LiteLLM Dashboard
+
 ```bash
 litellm --config config.yaml --debug
 # Dashboard: http://localhost:4000
 ```
 
-### Custom Script Logging:
+### Custom Script Logging
+
 ```python
 import logging
 
@@ -784,9 +836,10 @@ logger.info(f"Provider: {provider}, Model: {model}, Tokens: {tokens}")
 ## 🚀 Deployment Options
 
 ### Docker Compose (All-in-One)
+
 ```yaml
 # docker-compose.yml
-version: '3.8'
+version: "3.8"
 
 services:
   bifrost:
@@ -816,6 +869,7 @@ services:
 ```
 
 **Run:**
+
 ```bash
 docker-compose up -d
 ```
@@ -824,17 +878,19 @@ docker-compose up -d
 
 ## 📚 Tài Liệu Tham Khảo
 
-### Official Docs:
-- Cloudflare Workers AI: https://developers.cloudflare.com/workers-ai/
-- GitHub Models: https://docs.github.com/en/github-models
-- Bifrost: https://github.com/maximhq/bifrost
-- LiteLLM: https://docs.litellm.ai/
-- Olla: https://thushan.github.io/olla/
+### Official Docs
 
-### GitHub Repos:
-- Free AI Resources: https://github.com/ShaikhWarsi/free-ai-tools
-- Free LLM APIs: https://github.com/cheahjs/free-llm-api-resources
-- AI Router Tools: https://github.com/topics/ai-router
+- Cloudflare Workers AI: <https://developers.cloudflare.com/workers-ai/>
+- GitHub Models: <https://docs.github.com/en/github-models>
+- Bifrost: <https://github.com/maximhq/bifrost>
+- LiteLLM: <https://docs.litellm.ai/>
+- Olla: <https://thushan.github.io/olla/>
+
+### GitHub Repos
+
+- Free AI Resources: <https://github.com/ShaikhWarsi/free-ai-tools>
+- Free LLM APIs: <https://github.com/cheahjs/free-llm-api-resources>
+- AI Router Tools: <https://github.com/topics/ai-router>
 
 ---
 
@@ -881,6 +937,7 @@ curl http://localhost:8080/v1/chat/completions \
 ## 🧪 Implementation Examples
 
 ### 0) Kiến trúc gộp các nguồn free vào 1 route
+
 Repo này đã gom các nguồn free/free-tier vào một gateway OpenAI-compatible duy nhất:
 
 ```text
@@ -904,6 +961,7 @@ Router weighted + adaptive + cooldown
 Client chỉ cần gọi 1 endpoint và 1 model ảo, ví dụ `smart-chat`. Gateway tự chọn provider còn hoạt động, tự bỏ qua provider thiếu API key, tự cooldown provider lỗi nhiều lần, và trả về provider thật trong `x-ai-provider` / `router.provider`.
 
 Các luồng đã nối chung vào router:
+
 - Chat thường: `/v1/chat/completions`
 - Tạo ảnh: `/v1/images/generations`
 - RAG: `/v1/rag/ingest`, `/v1/rag/search`, `/v1/rag/chat`
@@ -912,10 +970,12 @@ Các luồng đã nối chung vào router:
 - Benchmark phân phối provider: `python benchmark_router.py ...`
 
 Cloudflare có 2 cách dùng:
+
 - Là một provider trong chain hiện tại qua `CLOUDFLARE_BASE_URL`.
 - Là upstream hub nếu bạn cấu hình Cloudflare AI Gateway Dynamic Route/BYOK, rồi đặt `CLOUDFLARE_MODEL=dynamic/default` hoặc gọi alias `cf-dynamic`.
 
 ### 1) Chạy gateway local (repo này)
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -927,16 +987,19 @@ python simple_ai_gateway.py
 ```
 
 Mở sản phẩm web:
+
 ```bash
 open http://localhost:8000/hub
 ```
 
 Nếu không dùng lệnh `open`, vào trình duyệt và mở:
+
 ```text
 http://localhost:8000/hub
 ```
 
 Lưu ý khi sửa `.env`:
+
 - Giữ biến số ở dạng số thuần, ví dụ `ADAPTIVE_LATENCY_ALPHA=0.3`.
 - Không nối path vào biến số. Sai: `ADAPTIVE_LATENCY_ALPHA=0.3/Users/.../.venv`.
 - Khi dùng `source .env`, các biến JSON phải được bọc bằng nháy đơn:
@@ -945,6 +1008,7 @@ Lưu ý khi sửa `.env`:
 - `.cursor/settings.json` chỉ là cấu hình editor Cursor, không ảnh hưởng runtime gateway.
 
 Config mặc định trong `.env.example` đã bật chain rộng:
+
 ```env
 PROVIDER_CHAIN=cloudflare,github,groq,openrouter,gemini,huggingface,cerebras,sambanova,freetheai,ollama
 ROUTING_MODE=weighted
@@ -954,6 +1018,7 @@ ADAPTIVE_ROUTING=1
 Bạn chỉ cần điền key provider nào có. Provider không có key sẽ tự bị bỏ qua.
 
 ### 2) Gọi model ảo `smart-chat` (auto xoay provider)
+
 ```bash
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -967,6 +1032,7 @@ curl http://localhost:8000/v1/chat/completions \
 ```
 
 Hoặc gọi alias Gemma:
+
 ```bash
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -979,26 +1045,32 @@ curl http://localhost:8000/v1/chat/completions \
 ```
 
 ### 3) Xem provider nào đã trả lời
+
 Gateway trả thêm:
+
 - Header: `x-ai-provider`, `x-ai-model`
 - Body: `router.provider`, `router.model`
 
 ### 4) Xem alias models đang map
+
 ```bash
 curl http://localhost:8000/router/models
 ```
 
 ### 5) Xem router health state + cooldown
+
 ```bash
 curl http://localhost:8000/router/state
 ```
 
 ### 5.1) Export metrics kiểu Prometheus
+
 ```bash
 curl http://localhost:8000/metrics
 ```
 
 ### 6) Gọi Gemma theo profile mạnh
+
 ```bash
 # Cân bằng tốc độ/chất lượng
 curl http://localhost:8000/v1/chat/completions \
@@ -1012,6 +1084,7 @@ curl http://localhost:8000/v1/chat/completions \
 ```
 
 ### 7) Benchmark router phân phối traffic
+
 ```bash
 python benchmark_router.py \
   --base-url http://localhost:8000 \
@@ -1021,13 +1094,16 @@ python benchmark_router.py \
 ```
 
 ### 8) Các biến tuning quan trọng
+
 - `ROUTING_MODE=weighted` để bật chia tải theo trọng số.
 - `PROVIDER_WEIGHTS_JSON` để set baseline traffic share.
 - `ADAPTIVE_ROUTING=1` để tự điều chỉnh weight theo error-rate + latency.
 - `PROVIDER_FAILURE_THRESHOLD` + `PROVIDER_COOLDOWN_S` cho circuit breaker.
 
 ### 9) Dùng RAG ngay trong gateway
+
 Ingest tài liệu:
+
 ```bash
 curl http://localhost:8000/v1/rag/ingest \
   -H "Content-Type: application/json" \
@@ -1043,6 +1119,7 @@ curl http://localhost:8000/v1/rag/ingest \
 ```
 
 Search context:
+
 ```bash
 curl http://localhost:8000/v1/rag/search \
   -H "Content-Type: application/json" \
@@ -1050,6 +1127,7 @@ curl http://localhost:8000/v1/rag/search \
 ```
 
 Chat với RAG + auto-routing:
+
 ```bash
 curl http://localhost:8000/v1/rag/chat \
   -H "Content-Type: application/json" \
@@ -1061,6 +1139,7 @@ curl http://localhost:8000/v1/rag/chat \
 ```
 
 Endpoint sản phẩm gộp cho chat/RAG/fine-tune:
+
 ```bash
 curl http://localhost:8000/v1/ai/chat \
   -H "Content-Type: application/json" \
@@ -1074,11 +1153,13 @@ curl http://localhost:8000/v1/ai/chat \
 Đổi `mode` thành `rag`, `fine_tune`, hoặc `rag_fine_tune` để dùng các luồng đã tích hợp.
 
 Tạo ảnh ngay trong `/hub`: chọn mode `Image / Flux`, nhập prompt như:
+
 ```text
 Một robot nhỏ đang điều phối nhiều model AI miễn phí, phong cách cinematic, chi tiết cao
 ```
 
 API tạo ảnh trực tiếp:
+
 ```bash
 curl http://localhost:8000/v1/images/generations \
   -H "Content-Type: application/json" \
@@ -1086,6 +1167,7 @@ curl http://localhost:8000/v1/images/generations \
 ```
 
 Gọi Cloudflare dynamic route nếu bạn đã cấu hình AI Gateway Dynamic Route/BYOK:
+
 ```bash
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -1098,6 +1180,7 @@ curl http://localhost:8000/v1/chat/completions \
 ```
 
 ### 10) Dùng fine-tune profile
+
 Endpoint này không train model thật; nó dùng `tuning_id` như một expert profile/system prompt rồi vẫn auto-route qua provider đang cấu hình.
 
 ```bash
@@ -1112,6 +1195,7 @@ curl http://localhost:8000/v1/fine_tune/chat \
 ```
 
 ### 11) Dùng RAG + fine-tune profile cùng lúc
+
 Luồng này retrieve context từ store trước, sau đó trả lời bằng fine-tune profile.
 
 ```bash
@@ -1142,7 +1226,7 @@ router:
       model: openrouter/llama-3-70b
       api_base: https://openrouter.ai/api/v1
       api_key: OPENROUTER_KEY
-      weight: 4          # Ưu tiên cao nhất
+      weight: 4 # Ưu tiên cao nhất
       timeout: 10
     - name: groq
       model: groq/llama3-8b
@@ -1155,7 +1239,7 @@ router:
       api_base: https://api.x.ai/v1
       api_key: XAI_KEY
       weight: 1
-      cost_per_1k_tokens: 0.0002  # để tracking
+      cost_per_1k_tokens: 0.0002 # để tracking
 
 litellm_settings:
   retries: 2
@@ -1169,6 +1253,7 @@ litellm_settings:
 ```
 
 **Router logic (LiteLLM tự xử lý):**
+
 1. Gửi request đến **openrouter** (weight cao nhất).
 2. Nếu lỗi 429 (rate limit) hoặc 5xx → tự động chuyển sang **groq**.
 3. Nếu groq cũng lỗi → rớt xuống **xai** (Grok 4.1 Fast).
@@ -1213,11 +1298,13 @@ integrations:
 ```
 
 **Mỗi request qua Gateway đều được log:**
+
 - Tổng token / request
 - Cost theo `cost_per_1k_tokens`
 - Model sử dụng (để audit hoặc tối ưu router)
 
 **Dashboard realtime hiển thị:**
+
 - 💰 Tổng chi phí theo ngày
 - 🔄 Tỉ lệ fallback (bao nhiêu request gặp lỗi 429)
 - ⚖️ Load mỗi provider
@@ -1245,9 +1332,9 @@ Reload container → provider mới lập tức tham gia vào pool routing.
 
 LiteLLM hỗ trợ route theo `tag` trong metadata, giúp mapping task → model tối ưu:
 
-| Tag | Route đến | Lý do |
-|-----|-----------|-------|
-| `EASY` | Groq / OpenRouter | Chat đơn giản, classify, rewrite — nhanh và rẻ |
+| Tag    | Route đến          | Lý do                                                |
+| ------ | ------------------ | ---------------------------------------------------- |
+| `EASY` | Groq / OpenRouter  | Chat đơn giản, classify, rewrite — nhanh và rẻ       |
 | `HARD` | xAI / Claude / GPT | Code, reasoning, phân tích phức tạp — cần chất lượng |
 
 ```bash

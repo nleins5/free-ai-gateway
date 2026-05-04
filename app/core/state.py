@@ -12,6 +12,7 @@ class StateStore:
         self.daily_usage: Dict[str, Dict[str, Any]] = {}
         self.daily_usage_date: str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
         self.rr_counter: int = 0
+        self.user_usage: Dict[str, int] = {}
 
     def _ensure_daily_reset(self) -> None:
         today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
@@ -122,6 +123,16 @@ class StateStore:
         self.rr_counter += 1
         return res
 
+    def get_user_prompts(self, user_id: str) -> int:
+        if not user_id:
+            return 0
+        return self.user_usage.get(user_id, 0)
+
+    def increment_user_prompt(self, user_id: str) -> None:
+        if not user_id:
+            return
+        self.user_usage[user_id] = self.get_user_prompts(user_id) + 1
+
     # ── Telemetry methods used by admin API ──────────────────────
 
     def get_all_states(self) -> Dict[str, Any]:
@@ -136,5 +147,3 @@ class StateStore:
             "daily_usage_date": self.daily_usage_date,
             "total_cost_usd": round(self.get_total_cost(), 6),
         }
-
-state_store = StateStore()

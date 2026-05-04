@@ -1,19 +1,43 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from app.dependencies import verify_admin
-from app.core.state import state_store
 from app.config import settings, reload_config
 
 router = APIRouter()
 
 @router.get("/stats", dependencies=[Depends(verify_admin)])
-async def get_gateway_stats():
+async def get_gateway_stats(request: Request):
     """Get runtime statistics for all providers."""
-    return state_store.get_all_states()
+    return request.app.state.state_store.get_all_states()
+
+@router.get("/providers", dependencies=[Depends(verify_admin)])
+async def get_gateway_providers():
+    """Get configured provider status and info."""
+    providers_list = []
+    
+    # Identify unique providers from task tiers and provider chain
+    all_provider_keys = set(settings.provider_chain)
+    for p_list in settings.task_tiers.values():
+        all_provider_keys.update(p_list)
+        
+    for p_key in all_provider_keys:
+        tasks = [tier for tier, t_list in settings.task_tiers.items() if p_key in t_list]
+        providers_list.append({
+            "name": p_key.capitalize(),
+            "key": p_key,
+            "active": True,
+            "in_chain": p_key in settings.provider_chain,
+            "tasks": tasks
+        })
+        
+    return {
+        "providers": providers_list,
+        "chain_order": settings.provider_chain
+    }
 
 @router.post("/reload", dependencies=[Depends(verify_admin)])
 async def reload_providers_config():
     """Trigger a hot-reload of providers.json configuration."""
-    reload_config()
+    await reload_config()
     return {
         "status": "success",
         "message": "Configuration reloaded from providers.json",

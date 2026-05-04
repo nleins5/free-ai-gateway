@@ -14,6 +14,7 @@ async def chat_completions(
     """OpenAI-compatible chat completions endpoint."""
     response, meta = await router_svc.chat_with_failover(
         messages=[m.model_dump() for m in req.messages],
+        user_id=req.user_id,
         model_override=req.model,
         temperature=req.temperature,
         max_tokens=req.max_tokens
@@ -51,6 +52,7 @@ async def unified_chat(
     # 2. Call router with task-based failover
     response, meta = await router_svc.chat_with_failover(
         messages=messages,
+        user_id=req.user_id,
         model_override=req.model_override,
         task=req.task
     )

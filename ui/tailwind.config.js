@@ -7,15 +7,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        void: '#0A0A14',
-        plasma: '#7B61FF',
-        ghost: '#F0EFF4',
-        graphite: '#18181B'
+        void: '#0D0D12',
+        plasma: '#C9A84C',
+        ghost: '#FAF8F5',
+        graphite: '#2A2A35'
       },
       fontFamily: {
-        sans: ['Sora', 'sans-serif'],
-        serif: ['Instrument Serif', 'serif'],
-        mono: ['Fira Code', 'monospace']
+        sans: ['Inter', 'sans-serif'],
+        serif: ['Playfair Display', 'serif'],
+        mono: ['JetBrains Mono', 'monospace']
       }
     },
   },

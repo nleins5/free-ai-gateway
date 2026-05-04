@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = None
     extra_body: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = None
 
 class ImageRequest(BaseModel):
     prompt: str
@@ -57,3 +58,4 @@ class UnifiedAIChatRequest(BaseModel):
     stream: Optional[bool] = False
     system_prompt: Optional[str] = None
     use_rag: Optional[bool] = False
+    user_id: Optional[str] = None

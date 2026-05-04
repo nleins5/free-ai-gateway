@@ -2,6 +2,8 @@ import os
 import json
 import re
 import time
+import math
+import aiofiles
 from typing import Any, Dict, List, Set, Tuple
 from fastapi import HTTPException
 from app.models import RAGDocument
@@ -11,26 +13,44 @@ class SimpleRAGStore:
     def __init__(self, path: str):
         self.path = path
         self.chunks: List[Dict[str, Any]] = []
-        self._load()
+        self._doc_frequencies = {}
+        self._avgdl = 0.0
 
-    def _load(self) -> None:
+    async def initialize(self):
+        await self._load()
+        self._recompute_stats()
+
+    async def _load(self) -> None:
         if not os.path.exists(self.path):
             self.chunks = []
             return
         try:
-            with open(self.path, "r", encoding="utf-8") as f:
-                payload = json.load(f)
+            async with aiofiles.open(self.path, "r", encoding="utf-8") as f:
+                content = await f.read()
+                payload = json.loads(content)
             self.chunks = payload.get("chunks", []) if isinstance(payload, dict) else []
         except Exception:
             self.chunks = []
 
-    def _save(self) -> None:
+    async def _save(self) -> None:
         try:
-            with open(self.path, "w", encoding="utf-8") as f:
-                json.dump({"chunks": self.chunks}, f, ensure_ascii=False)
+            async with aiofiles.open(self.path, "w", encoding="utf-8") as f:
+                content = json.dumps({"chunks": self.chunks}, ensure_ascii=False)
+                await f.write(content)
         except Exception as e:
-            # TODO: Logging
-            print(f"Failed to save RAG store: {e}")
+            import logging
+            logging.error(f"Failed to save RAG store: {e}")
+
+    def _recompute_stats(self):
+        self._doc_frequencies = {}
+        total_len = 0
+        for chunk in self.chunks:
+            tokens = chunk.get("tokens", [])
+            total_len += len(tokens)
+            unique_tokens = set(tokens)
+            for t in unique_tokens:
+                self._doc_frequencies[t] = self._doc_frequencies.get(t, 0) + 1
+        self._avgdl = total_len / max(len(self.chunks), 1)
 
     @staticmethod
     def _tokenize(text: str) -> List[str]:
@@ -52,7 +72,7 @@ class SimpleRAGStore:
             start += step
         return chunks
 
-    def ingest(self, docs: List[RAGDocument]) -> Dict[str, int]:
+    async def ingest(self, docs: List[RAGDocument]) -> Dict[str, int]:
         added_chunks = 0
         for i, doc in enumerate(docs):
             doc_id = doc.doc_id or f"doc-{int(time.time())}-{i}"
@@ -71,27 +91,42 @@ class SimpleRAGStore:
                     }
                 )
                 added_chunks += 1
-        self._save()
+        if added_chunks > 0:
+            self._recompute_stats()
+            await self._save()
         return {"documents": len(docs), "chunks": added_chunks}
 
     def search(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         q_tokens = self._tokenize(query)
         if not q_tokens or not self.chunks:
             return []
-        q_set: Set[str] = set(q_tokens)
+            
+        k1 = 1.5
+        b = 0.75
+        N = len(self.chunks)
+        avgdl = self._avgdl or 1.0
+
         scored: List[Tuple[float, Dict[str, Any]]] = []
         for chunk in self.chunks:
             tokens = chunk.get("tokens", [])
             if not tokens:
                 continue
-            token_set = set(tokens)
-            overlap = len(q_set.intersection(token_set))
-            if overlap == 0:
-                continue
-            lexical = overlap / max(len(q_set), 1)
-            density = overlap / max(len(token_set), 1)
-            score = (0.7 * lexical) + (0.3 * density)
-            scored.append((score, chunk))
+            
+            score = 0.0
+            doc_len = len(tokens)
+            
+            for q in set(q_tokens):
+                tf = tokens.count(q)
+                if tf == 0:
+                    continue
+                df = self._doc_frequencies.get(q, 0)
+                idf = math.log(1 + (N - df + 0.5) / (df + 0.5))
+                term_score = idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc_len / avgdl)))
+                score += term_score
+
+            if score > 0:
+                scored.append((score, chunk))
+        
         scored.sort(key=lambda x: x[0], reverse=True)
         return [
             {
@@ -117,9 +152,9 @@ class RAGService:
         self._store = store
 
     # --- Ingest ---
-    def ingest(self, docs: List[RAGDocument]) -> Dict[str, int]:
+    async def ingest(self, docs: List[RAGDocument]) -> Dict[str, int]:
         """Index a batch of RAGDocument objects."""
-        return self._store.ingest(docs)
+        return await self._store.ingest(docs)
 
     # --- Search ---
     def search(self, query: str, top_k: int = 4) -> List[Dict[str, Any]]:
@@ -148,8 +183,5 @@ class RAGService:
             )
         return "\n\n".join(context_lines), sources
 
+# Singletons removed, will be attached to app.state
 
-# ── Global singletons ────────────────────────────────────────────
-
-rag_store = SimpleRAGStore(RAG_STORE_PATH)
-rag_service = RAGService(rag_store)
