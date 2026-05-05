@@ -83,6 +83,18 @@ class Settings:
     def groq_api_key(self) -> str | None:
         return os.getenv("GROQ_API_KEY")
 
+    @property
+    def nvidia_api_key(self) -> str | None:
+        return os.getenv("NVIDIA_API_KEY") or os.getenv("NVIDIA_API_KEY_CUSTOM")
+
+    @property
+    def nvidia_api_key_33(self) -> str | None:
+        return os.getenv("NVIDIA_API_KEY_33")
+
+    @property
+    def nvidia_api_key_77(self) -> str | None:
+        return os.getenv("NVIDIA_API_KEY_77")
+
 settings = Settings()
 
 def reload_config_sync():

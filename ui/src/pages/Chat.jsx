@@ -48,6 +48,7 @@ const Chat = () => {
     const wsRef = useRef(null);
     const recordingIntervalRef = useRef(null);
     const [liveTranscript, setLiveTranscript] = useState('');
+    const [audioLevel, setAudioLevel] = useState(0);
     
     const [userId, setUserId] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -92,10 +93,11 @@ const Chat = () => {
         e.preventDefault();
         if (!input.trim() || !userId) return;
         
-        if (promptCount >= 100) {
-            setShowModal(true);
-            return;
-        }
+        // Limits disabled
+        // if (promptCount >= 100) {
+        //     setShowModal(true);
+        //     return;
+        // }
 
         const userMsg = { role: 'user', content: input };
         setMessages(prev => [...prev, userMsg]);
@@ -213,7 +215,7 @@ const Chat = () => {
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
             let silenceStart = Date.now();
             const SILENCE_THRESHOLD = 15; // Noise threshold (0-255)
-            const SILENCE_DURATION = 2000; // 2 seconds of silence auto-stop
+            const SILENCE_DURATION = 2500; // 2.5 seconds of silence auto-stop
 
             const checkSilence = () => {
                 if (recorder.state === 'inactive') return;
@@ -221,6 +223,9 @@ const Chat = () => {
                 analyser.getByteFrequencyData(dataArray);
                 const sum = dataArray.reduce((a, b) => a + b, 0);
                 const average = sum / dataArray.length;
+                
+                // Update visualizer state
+                setAudioLevel(Math.min(100, Math.round((average / 255) * 100 * 2.5)));
 
                 if (average > SILENCE_THRESHOLD) {
                     silenceStart = Date.now(); // Reset timer when sound is detected
@@ -269,7 +274,7 @@ const Chat = () => {
                     audioChunksRef.current.push(e.data);
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                         const finalMimeType = recorder.mimeType || (options ? options.mimeType : 'audio/mp4');
-                        const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
+                        const audioBlob = new Blob([...audioChunksRef.current], { type: finalMimeType });
                         wsRef.current.send(audioBlob);
                     }
                 }
@@ -283,11 +288,19 @@ const Chat = () => {
                 }
                 
                 setIsRecording(false);
-                
+                setAudioLevel(0);
+
                 // Add the transcript we built up over websocket
                 setLiveTranscript(current => {
                     if (current) {
                         setInput(prev => (prev ? prev + ' ' : '') + current.trim());
+                        // Auto-send if there's text
+                        if (current.trim()) {
+                            setTimeout(() => {
+                                const fakeEvent = { preventDefault: () => {} };
+                                handleSubmit(fakeEvent);
+                            }, 100);
+                        }
                     }
                     return '';
                 });
@@ -339,7 +352,7 @@ const Chat = () => {
     return (
         <div className="flex h-screen bg-[#05050A] font-sans">
             {/* Sidebar */}
-            <div className="w-64 border-r border-graphite bg-void flex flex-col">
+            <div className="w-64 border-r border-graphite bg-void hidden md:flex flex-col">
                 <div className="p-6 border-b border-graphite flex items-center gap-3">
                     <Link to="/" className="text-ghost/60 hover:text-ghost transition-colors">
                         <ArrowLeft className="w-5 h-5" />
@@ -370,8 +383,8 @@ const Chat = () => {
                 <div className="absolute inset-0 bg-void/95 backdrop-blur-3xl z-0"></div>
                 
                 {/* Header */}
-                <div className="relative z-10 h-16 border-b border-graphite flex items-center justify-between px-6 bg-void/50 backdrop-blur-md">
-                    <div className="flex items-center gap-2 bg-graphite/40 p-1 rounded-lg">
+                <div className="relative z-10 h-16 border-b border-graphite flex items-center justify-between px-4 md:px-6 bg-void/50 backdrop-blur-md">
+                    <div className="flex items-center gap-1 md:gap-2 bg-graphite/40 p-1 rounded-lg overflow-x-auto no-scrollbar">
                         {modes.map(m => (
                             <button 
                                 key={m.id}
@@ -420,7 +433,27 @@ const Chat = () => {
                                         handleSubmit(e);
                                     }
                                 }}
-                            />
+                                />
+                            
+                            {/* Audio Visualizer overlay */}
+                            {isRecording && (
+                                <div className="absolute inset-x-0 bottom-16 h-12 flex items-center justify-center gap-1 opacity-80 pointer-events-none">
+                                    {[...Array(20)].map((_, i) => {
+                                        // create a symmetric wave effect
+                                        const symmetricIndex = Math.abs(i - 9.5); 
+                                        const dropoff = Math.max(0.1, 1 - (symmetricIndex * 0.1));
+                                        const height = Math.max(4, audioLevel * dropoff);
+                                        return (
+                                            <div 
+                                                key={i} 
+                                                className="w-1.5 bg-plasma rounded-full transition-all duration-75"
+                                                style={{ height: `${height}px` }}
+                                            />
+                                        )
+                                    })}
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-center px-2 pb-1">
                                 <button 
                                     type="button" 
