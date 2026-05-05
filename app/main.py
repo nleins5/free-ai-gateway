@@ -210,4 +210,12 @@ if os.path.exists(ui_path):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    ssl_keyfile = os.path.join(os.path.dirname(__file__), "..", "localhost.key")
+    ssl_certfile = os.path.join(os.path.dirname(__file__), "..", "localhost.crt")
+
+    if os.path.exists(ssl_keyfile) and os.path.exists(ssl_certfile):
+        print("Starting with HTTPS...")
+        uvicorn.run(app, host="0.0.0.0", port=8443, ssl_keyfile=ssl_keyfile, ssl_certfile=ssl_certfile)
+    else:
+        print("Starting with HTTP...")
+        uvicorn.run(app, host="0.0.0.0", port=8000)

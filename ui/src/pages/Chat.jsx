@@ -186,12 +186,7 @@ const Chat = () => {
             }
             
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 16000
-                }
+                audio: true // Simplified constraints for maximum compatibility on Safari
             });
             
             // Detect supported mime type for Safari/Mac compatibility
@@ -202,7 +197,13 @@ const Chat = () => {
                 options = { mimeType: 'audio/mp4' };
             }
                 
-            const recorder = new MediaRecorder(stream, options);
+            let recorder;
+            try {
+                recorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                console.warn('Failed to initialize MediaRecorder with options, falling back to default', e);
+                recorder = new MediaRecorder(stream);
+            }
             
             // Set up AudioContext for Voice Activity Detection (VAD) / Silence detection
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -242,89 +243,95 @@ const Chat = () => {
                 animationFrameRef.current = requestAnimationFrame(checkSilence);
             };
 
-            // Set up WebSocket for real-time STT
-            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsHost = API_BASE ? API_BASE.replace(/^https?/, wsProtocol) : `${wsProtocol}//${window.location.host}`;
-            const wsUrl = `${wsHost}/v1/audio/stream`;
-            const ws = new WebSocket(wsUrl);
-            wsRef.current = ws;
-
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.text) {
-                        setLiveTranscript(data.text);
-                    }
-                } catch (e) {
-                    console.error('WS parse error:', e);
-                }
-            };
-
             recorder.onstart = () => {
                 silenceStart = Date.now();
+                audioChunksRef.current = [];
+                setLiveTranscript('');
+                console.log('Recording started, mimeType:', recorder.mimeType);
                 checkSilence();
-                // Request data every 1000ms
-                recordingIntervalRef.current = setInterval(() => {
-                    if (recorder.state === 'recording') {
-                        recorder.requestData();
-                    }
-                }, 1000);
             };
             
             recorder.ondataavailable = (e) => {
+                console.log('Data available:', e.data.size, 'bytes');
                 if (e.data.size > 0) {
                     audioChunksRef.current.push(e.data);
-                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                        const finalMimeType = recorder.mimeType || (options ? options.mimeType : 'audio/mp4');
-                        const audioBlob = new Blob([...audioChunksRef.current], { type: finalMimeType });
-                        wsRef.current.send(audioBlob);
-                    }
                 }
             };
 
             recorder.onstop = async () => {
+                console.log('Recorder stopped. Chunks:', audioChunksRef.current.length);
                 if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
                 if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
                 if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
                     audioContextRef.current.close();
                 }
-                
+
                 setIsRecording(false);
                 setAudioLevel(0);
 
-                // Add the transcript we built up over websocket
-                setLiveTranscript(current => {
-                    if (current) {
-                        setInput(prev => (prev ? prev + ' ' : '') + current.trim());
-                        // Auto-send if there's text
-                        if (current.trim()) {
-                            setTimeout(() => {
-                                const fakeEvent = { preventDefault: () => {} };
-                                handleSubmit(fakeEvent);
-                            }, 100);
-                        }
-                    }
-                    return '';
-                });
-
-                if (wsRef.current) {
-                    wsRef.current.close();
-                    wsRef.current = null;
-                }
-                
-                audioChunksRef.current = [];
-                
                 // Stop all tracks to release microphone
                 stream.getTracks().forEach(track => track.stop());
+
+                // Create a single blob from all chunks
+                const finalMimeType = recorder.mimeType || (options ? options.mimeType : 'audio/mp4');
+                console.log('Creating blob with type:', finalMimeType, 'chunks:', audioChunksRef.current.length);
+                const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
+                console.log('Blob created:', audioBlob.size, 'bytes');
+                audioChunksRef.current = [];
+                
+                if (audioBlob.size > 0) {
+                    setLiveTranscript('Đang xử lý giọng nói...');
+                    try {
+                        const formData = new FormData();
+                        const extension = finalMimeType.includes('webm') ? 'webm' : 'mp4';
+                        formData.append('file', audioBlob, `audio.${extension}`);
+                        
+                        const res = await fetch(`${API_BASE}/v1/audio/transcriptions`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            const text = data.text?.trim() || '';
+                            console.log('Transcription result:', text);
+                            if (text && text !== "1" && text !== "1." && text !== "Đây là câu nói tiếng Việt.") {
+                                const newInput = (input ? input + ' ' : '') + text;
+                                setInput(newInput);
+                                setLiveTranscript('');
+                                // Auto-submit after state updates
+                                setTimeout(() => {
+                                    handleSubmit({ preventDefault: () => {} });
+                                }, 300);
+                            } else {
+                                setLiveTranscript('Không nghe rõ, vui lòng thử lại.');
+                                setTimeout(() => setLiveTranscript(''), 2000);
+                            }
+                        } else {
+                            const err = await res.json();
+                            setToast(`Lỗi xử lý giọng nói: ${err.detail || err.error || res.statusText}`);
+                            setLiveTranscript('');
+                        }
+                    } catch (error) {
+                        console.error('Audio upload error:', error);
+                        setToast(`Lỗi upload: ${error.message}`);
+                        setLiveTranscript('');
+                    }
+                }
             };
 
-            audioChunksRef.current = [];
-            recorder.start();
+            recorder.start(100); // Collect data every 100ms for debugging
             setMediaRecorder(recorder);
             setIsRecording(true);
         } catch (err) {
             console.error('Mic error:', err);
-            setToast('Không thể truy cập Microphone. Vui lòng cấp quyền.');
+            let errMsg = 'Không thể truy cập Microphone. Vui lòng cấp quyền.';
+            if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+                errMsg = 'Quyền bị từ chối. Vui lòng kiểm tra cài đặt Microphone trong System Settings > Privacy & Security > Microphone của Mac và cho phép trình duyệt của bạn.';
+            } else {
+                errMsg = `Lỗi: ${err.message}`;
+            }
+            setToast(errMsg);
             setIsRecording(false);
         }
     };
