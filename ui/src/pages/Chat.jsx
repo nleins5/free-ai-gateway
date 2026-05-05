@@ -243,7 +243,9 @@ const Chat = () => {
             };
 
             // Set up WebSocket for real-time STT
-            const wsUrl = API_BASE.replace(/^http/, 'ws') + '/v1/audio/stream';
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsHost = API_BASE ? API_BASE.replace(/^https?/, wsProtocol) : `${wsProtocol}//${window.location.host}`;
+            const wsUrl = `${wsHost}/v1/audio/stream`;
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
