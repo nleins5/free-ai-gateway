@@ -568,7 +568,7 @@ const Protocol = () => {
                 <p className="text-xl text-[var(--bg-light)]/60 font-outfit mb-12">
                   {step.desc}
                 </p>
-                <MagneticButton variant="glass" className="px-10">
+                <MagneticButton variant="glass" className="px-10" onClick={() => window.open("/docs", "_blank")}>
                   Detailed Documentation
                 </MagneticButton>
               </div>

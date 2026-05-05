@@ -12,6 +12,7 @@ venv/
 
 # Environment & secrets
 .env
+.neon
 *.log
 
 # Data persistence

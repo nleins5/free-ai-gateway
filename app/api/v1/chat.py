@@ -92,6 +92,21 @@ async def unified_chat(
     Handles RAG integration and task-based routing.
     """
     user = await _resolve_user(x_api_key, db)
+    
+    # Auto-register guest users from frontend if they don't exist
+    if not user and req.user_id:
+        result = await db.execute(select(User).where(User.id == req.user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            user = User(
+                id=req.user_id,
+                username=f"guest_{req.user_id[:8]}",
+                api_key=f"sk_guest_{req.user_id}",
+                role="guest"
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
     messages = []
     
     # 1. Handle RAG if requested

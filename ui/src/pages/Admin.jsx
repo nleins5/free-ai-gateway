@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import gsap from 'gsap';
-import { Activity, Zap, DollarSign, Server, RefreshCw, Terminal, Shield, Cpu, Binary, ArrowLeft } from 'lucide-react';
+import { Activity, Zap, DollarSign, Server, RefreshCw, Terminal, Shield, Cpu, ArrowLeft, Users, TrendingUp, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_BASE || (window.location.hostname === 'localhost' ? 'http://localhost:8000' : '');
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const MagneticButton = ({ children, className = "", onClick, to, variant = "primary", disabled, type="button" }) => {
   const btnRef = useRef(null);
@@ -120,10 +120,91 @@ const ProviderRow = ({ name, status, latency, weight, usage, tasks }) => {
   );
 };
 
+const UserRow = ({ user, maxRequests }) => {
+  const usagePercent = maxRequests > 0 ? (user.request_count / maxRequests) * 100 : 0;
+  const totalTokens = (user.tokens_in || 0) + (user.tokens_out || 0);
+  const lastActive = user.last_active ? new Date(user.last_active) : null;
+  const now = new Date();
+  const minutesAgo = lastActive ? Math.round((now - lastActive) / 60000) : null;
+
+  const getTimeAgo = () => {
+    if (!minutesAgo && minutesAgo !== 0) return 'Never';
+    if (minutesAgo < 1) return 'Just now';
+    if (minutesAgo < 60) return `${minutesAgo}m ago`;
+    if (minutesAgo < 1440) return `${Math.round(minutesAgo / 60)}h ago`;
+    return `${Math.round(minutesAgo / 1440)}d ago`;
+  };
+
+  const isOnline = minutesAgo !== null && minutesAgo < 5;
+
+  return (
+    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/5 px-6 -mx-6 rounded-2xl transition-all group">
+      <div className="flex items-center gap-4 w-[22%]">
+        <div className="relative">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black uppercase ${user.role === 'admin' ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30' : 'bg-white/10 text-white/60 border border-white/10'}`}>
+            {user.username?.slice(0, 2) || '??'}
+          </div>
+          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--primary)] ${isOnline ? 'bg-emerald-500' : user.is_active ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+        </div>
+        <div className="flex flex-col min-w-0">
+          <span className="font-bold text-white group-hover:text-[var(--accent)] transition-colors tracking-tight truncate">{user.username}</span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`data-mono text-[8px] uppercase px-1.5 py-0.5 rounded border ${user.role === 'admin' ? 'border-[var(--accent)]/30 text-[var(--accent)] bg-[var(--accent)]/5' : 'border-white/10 text-white/40 bg-white/5'}`}>{user.role}</span>
+            {!user.is_active && <span className="data-mono text-[8px] uppercase px-1.5 py-0.5 rounded border border-red-500/30 text-red-400 bg-red-500/5">Suspended</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="w-[15%] text-center">
+        <div className="data-mono text-sm text-white/90 font-bold">{user.request_count.toLocaleString()}</div>
+        <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Requests</div>
+      </div>
+
+      <div className="w-[18%] text-center">
+        <div className="data-mono text-sm text-white/90">{totalTokens.toLocaleString()}</div>
+        <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">
+          <span className="text-emerald-400/60">↓{(user.tokens_in || 0).toLocaleString()}</span>
+          <span className="mx-1 text-white/10">|</span>
+          <span className="text-blue-400/60">↑{(user.tokens_out || 0).toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div className="w-[15%] text-center">
+        <div className={`data-mono text-sm font-bold ${user.total_cost_usd > 1 ? 'text-[var(--accent)]' : user.total_cost_usd > 0 ? 'text-white/90' : 'text-white/30'}`}>
+          ${user.total_cost_usd.toFixed(4)}
+        </div>
+        <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Revenue</div>
+      </div>
+
+      <div className="w-[15%] flex flex-col items-center gap-1.5">
+        <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
+          <div
+            className={`h-full rounded-full transition-all duration-1000 ${
+              usagePercent > 80 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+              usagePercent > 50 ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]' :
+              'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+            }`}
+            style={{ width: `${Math.min(usagePercent, 100)}%` }}
+          ></div>
+        </div>
+        <span className="data-mono text-[9px] text-white/30">{Math.round(usagePercent)}% load</span>
+      </div>
+
+      <div className="w-[15%] text-right">
+        <div className={`data-mono text-xs ${isOnline ? 'text-emerald-400' : 'text-white/40'}`}>{getTimeAgo()}</div>
+        <div className="data-mono text-[9px] text-white/20 uppercase tracking-wider mt-0.5">Last seen</div>
+      </div>
+    </div>
+  );
+};
+
 const Admin = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [stats, setStats] = useState(null);
   const [providersData, setProvidersData] = useState([]);
+  const [usersData, setUsersData] = useState([]);
+  const [userSortField, setUserSortField] = useState('request_count');
+  const [userSortDir, setUserSortDir] = useState('desc');
   const [secret, setSecret] = useState(() => localStorage.getItem('adminSecret') || '');
   const [loading, setLoading] = useState(() => Boolean(localStorage.getItem('adminSecret')));
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -136,9 +217,10 @@ const Admin = () => {
     if (!currentSecret) return;
     try {
       const headers = { 'X-Admin-Key': currentSecret };
-      const [statsRes, providersRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/stats`, { headers }),
-        fetch(`${API_BASE}/admin/providers`, { headers })
+      const [statsRes, providersRes, usersRes] = await Promise.all([
+        fetch(`${API_BASE}/v1/admin/stats`, { headers }),
+        fetch(`${API_BASE}/v1/admin/providers`, { headers }),
+        fetch(`${API_BASE}/v1/admin/users`, { headers })
       ]);
 
       if (statsRes.status === 403 || providersRes.status === 403) {
@@ -176,6 +258,12 @@ const Admin = () => {
         });
 
         setProvidersData(mappedProviders);
+
+        // Fetch users data
+        if (usersRes && usersRes.ok) {
+          const usersJson = await usersRes.json();
+          setUsersData(usersJson.users || []);
+        }
       }
     } catch (error) {
       console.error("Telemetry failure:", error);
@@ -332,28 +420,28 @@ const Admin = () => {
         <div className="admin-reveal grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
           <MetricCard
             title="Neural Load"
-            value={stats ? stats.summary.total_requests.toLocaleString() : "---"}
+            value={stats ? (stats.total_requests_alltime || 0).toLocaleString() : "---"}
             subValue="Requests routed today"
             icon={Cpu}
             trend={12.4}
           />
           <MetricCard
             title="Signal Latency"
-            value={stats ? `${Math.round(Object.values(stats.providers).reduce((acc, p) => acc + p.latency_ewma_ms, 0) / Math.max(1, Object.keys(stats.providers).length))}ms` : "---"}
+            value={stats ? `${Math.round(Object.values(stats.providers || {}).reduce((acc, p) => acc + (p.latency_ewma_ms || 0), 0) / Math.max(1, Object.keys(stats.providers || {}).length))}ms` : "---"}
             subValue="Network weighted avg"
             icon={Zap}
             trend={-8.2}
           />
           <MetricCard
             title="Token Economy"
-            value={stats ? `$${stats.summary.total_cost_usd.toFixed(4)}` : "---"}
-            subValue={stats && stats.summary.budget_limit_usd > 0 ? `Quota: $${stats.summary.budget_limit_usd}` : "Unlimited Tier"}
+            value={stats ? `$${stats.total_cost_usd.toFixed(4)}` : "---"}
+            subValue={stats && stats.budget_limit_usd > 0 ? `Quota: $${stats.budget_limit_usd}` : "Unlimited Tier"}
             icon={DollarSign}
             trend={2.1}
           />
-          <MetricCard
+                    <MetricCard
             title="Active Nodes"
-            value={stats ? `${stats.config.active_providers.length}/${Object.keys(stats.providers).length}` : "0/0"}
+            value={stats ? `${providersData.filter(p => p.status === 'active').length}/${providersData.length}` : "0/0"}
             subValue="Current chain density"
             icon={Server}
             trend={null}
@@ -445,6 +533,173 @@ const Admin = () => {
                 <div className="h-full bg-[var(--accent)] w-full"></div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ═══════ USER BILLING TRACKER ═══════ */}
+        <div className="admin-reveal mt-12">
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+            <div>
+              <h2 className="text-4xl md:text-5xl tracking-tighter mb-2">
+                User <span className="font-drama text-[var(--accent)]">Billing.</span>
+              </h2>
+              <p className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40">
+                Revenue Tracking & Usage Monitoring
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+                <Users size={14} className="text-[var(--accent)] opacity-60" />
+                <span className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60">
+                  {usersData.length} Registered
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* User Billing KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <MetricCard
+              title="Total Users"
+              value={usersData.length.toString()}
+              subValue={`${usersData.filter(u => u.is_active).length} active accounts`}
+              icon={Users}
+              trend={null}
+            />
+            <MetricCard
+              title="Total Revenue"
+              value={`$${usersData.reduce((acc, u) => acc + (u.total_cost_usd || 0), 0).toFixed(4)}`}
+              subValue="All-time accumulated"
+              icon={TrendingUp}
+              trend={null}
+            />
+            <MetricCard
+              title="Avg Cost/User"
+              value={usersData.length > 0 ? `$${(usersData.reduce((acc, u) => acc + (u.total_cost_usd || 0), 0) / usersData.length).toFixed(4)}` : '$0.0000'}
+              subValue="Per-user average spend"
+              icon={DollarSign}
+              trend={null}
+            />
+          </div>
+
+          {/* Users Table */}
+          <div className="glass rounded-premium p-8 md:p-10 relative overflow-hidden">
+            <div className="flex justify-between items-center mb-8 relative z-10">
+              <div className="flex items-center gap-4">
+                <Eye className="w-6 h-6 text-[var(--accent)]" />
+                <h3 className="text-3xl tracking-tight">Usage Ledger</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="data-mono text-[9px] text-white/30 uppercase tracking-widest mr-2">Sort:</span>
+                {[
+                  { key: 'request_count', label: 'Requests' },
+                  { key: 'total_cost_usd', label: 'Revenue' },
+                  { key: 'tokens', label: 'Tokens' },
+                ].map(s => (
+                  <button
+                    key={s.key}
+                    onClick={() => {
+                      if (userSortField === s.key) {
+                        setUserSortDir(d => d === 'desc' ? 'asc' : 'desc');
+                      } else {
+                        setUserSortField(s.key);
+                        setUserSortDir('desc');
+                      }
+                    }}
+                    className={`data-mono text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all flex items-center gap-1 ${
+                      userSortField === s.key
+                        ? 'border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent)]/10'
+                        : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'
+                    }`}
+                  >
+                    {s.label}
+                    {userSortField === s.key && (
+                      userSortDir === 'desc' ? <ChevronDown size={10} /> : <ChevronUp size={10} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Header */}
+            <div className="flex data-mono text-[10px] text-[var(--bg-light)]/40 mb-4 px-6 uppercase tracking-widest relative z-10 border-b border-white/5 pb-4">
+              <div className="w-[22%]">User</div>
+              <div className="w-[15%] text-center">Requests</div>
+              <div className="w-[18%] text-center">Tokens (In/Out)</div>
+              <div className="w-[15%] text-center">Revenue</div>
+              <div className="w-[15%] text-center">Usage</div>
+              <div className="w-[15%] text-right">Last Active</div>
+            </div>
+
+            {/* Table Body */}
+            <div className="space-y-1 relative z-10 max-h-[500px] overflow-y-auto pr-2">
+              {usersData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <Users className="w-12 h-12 text-white/10" />
+                  <div className="text-center">
+                    <div className="text-white/30 text-sm mb-1">No users registered yet</div>
+                    <div className="data-mono text-[10px] uppercase tracking-widest text-white/15">
+                      Users will appear here once they interact with the gateway
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                [...usersData]
+                  .sort((a, b) => {
+                    let aVal, bVal;
+                    if (userSortField === 'tokens') {
+                      aVal = (a.tokens_in || 0) + (a.tokens_out || 0);
+                      bVal = (b.tokens_in || 0) + (b.tokens_out || 0);
+                    } else {
+                      aVal = a[userSortField] || 0;
+                      bVal = b[userSortField] || 0;
+                    }
+                    return userSortDir === 'desc' ? bVal - aVal : aVal - bVal;
+                  })
+                  .map(user => (
+                    <UserRow
+                      key={user.id}
+                      user={user}
+                      maxRequests={Math.max(...usersData.map(u => u.request_count || 1), 1)}
+                    />
+                  ))
+              )}
+            </div>
+
+            {/* Summary Footer */}
+            {usersData.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div>
+                  <div className="data-mono text-[9px] text-white/30 uppercase tracking-widest mb-1">Total Requests</div>
+                  <div className="text-xl font-black text-white tracking-tight">
+                    {usersData.reduce((acc, u) => acc + (u.request_count || 0), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="data-mono text-[9px] text-white/30 uppercase tracking-widest mb-1">Total Tokens</div>
+                  <div className="text-xl font-black text-white tracking-tight">
+                    {usersData.reduce((acc, u) => acc + (u.tokens_in || 0) + (u.tokens_out || 0), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="data-mono text-[9px] text-white/30 uppercase tracking-widest mb-1">Total Revenue</div>
+                  <div className="text-xl font-black text-[var(--accent)] tracking-tight">
+                    ${usersData.reduce((acc, u) => acc + (u.total_cost_usd || 0), 0).toFixed(4)}
+                  </div>
+                </div>
+                <div>
+                  <div className="data-mono text-[9px] text-white/30 uppercase tracking-widest mb-1">Active Now</div>
+                  <div className="text-xl font-black text-emerald-400 tracking-tight flex items-center gap-2">
+                    {usersData.filter(u => {
+                      if (!u.last_active) return false;
+                      return (new Date() - new Date(u.last_active)) < 300000;
+                    }).length}
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Mic, Sparkles, Code2, Image as ImageIcon, Search, Settings, ArrowLeft, Zap, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_BASE || (window.location.hostname === 'localhost' ? 'http://localhost:8000' : '');
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const ChatMessage = ({ msg }) => {
     const isAi = msg.role === 'assistant';
@@ -92,7 +92,7 @@ const Chat = () => {
         e.preventDefault();
         if (!input.trim() || !userId) return;
         
-        if (promptCount >= 13) {
+        if (promptCount >= 100) {
             setShowModal(true);
             return;
         }
@@ -136,7 +136,7 @@ const Chat = () => {
                 localStorage.setItem('prompt_count', newCount.toString());
 
                 if (newCount === 10 && currentTier === 'vip') {
-                    setToast('VIP Credits exhausted. Transitioning to Free AI tier for the next 3 prompts.');
+                    setToast('VIP Credits exhausted. Transitioning to Free AI tier for the next 90 prompts.');
                     setCurrentTier('general');
                 }
                 

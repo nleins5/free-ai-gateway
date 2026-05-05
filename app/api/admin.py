@@ -106,7 +106,7 @@ async def get_request_logs(
 async def list_users(
     db: AsyncSession = Depends(get_db),
 ):
-    """List all registered users with usage stats."""
+    """List all registered users with usage stats and billing data."""
     result = await db.execute(
         select(
             User.id,
@@ -117,6 +117,8 @@ async def list_users(
             func.count(RequestLog.id).label("request_count"),
             func.coalesce(func.sum(RequestLog.tokens_in), 0).label("tokens_in"),
             func.coalesce(func.sum(RequestLog.tokens_out), 0).label("tokens_out"),
+            func.coalesce(func.sum(RequestLog.cost_usd), 0.0).label("total_cost"),
+            func.max(RequestLog.created_at).label("last_active"),
         )
         .outerjoin(RequestLog, RequestLog.user_id == User.id)
         .group_by(User.id, User.username, User.role, User.is_active, User.created_at)
@@ -131,9 +133,11 @@ async def list_users(
             "role": row.role,
             "is_active": row.is_active,
             "created_at": str(row.created_at),
+            "last_active": str(row.last_active) if row.last_active else None,
             "request_count": row.request_count,
             "tokens_in": int(row.tokens_in),
             "tokens_out": int(row.tokens_out),
+            "total_cost_usd": round(float(row.total_cost), 6),
         })
     
     return {"users": users}
