@@ -123,7 +123,7 @@ sequenceDiagram
 
 The router uses Exponentially Weighted Moving Average to adapt in real-time:
 
-```
+```text
 latency_ewma = alpha * new_latency + (1 - alpha) * old_ewma
 effective_weight = base_weight * (1 - error_rate * penalty) / latency_ewma
 ```
@@ -218,6 +218,7 @@ The gateway prioritizes free models first. 80% of typical workloads (chat, summa
 The gateway tracks every request in real-time and exposes metrics through the Admin Dashboard and optional Langfuse integration.
 
 **Metrics tracked per request:**
+
 - Token count (input + output)
 - Cost calculated per model's `cost_per_1k_tokens`
 - Provider and model that served the request
@@ -225,6 +226,7 @@ The gateway tracks every request in real-time and exposes metrics through the Ad
 - Status (success / 429 / 5xx / timeout)
 
 **Dashboard displays:**
+
 - Total cost by day/week/month
 - Fallback ratio (how many requests hit rate limits)
 - Load distribution across providers
@@ -468,7 +470,7 @@ graph LR
 
 ## Project Structure
 
-```
+```text
 free-ai-gateway/
   app/
     main.py                  # FastAPI entry point
