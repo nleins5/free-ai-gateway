@@ -203,6 +203,7 @@ const Admin = () => {
   const [stats, setStats] = useState(null);
   const [providersData, setProvidersData] = useState([]);
   const [usersData, setUsersData] = useState([]);
+  const [logsData, setLogsData] = useState([]);
   const [userSortField, setUserSortField] = useState('request_count');
   const [userSortDir, setUserSortDir] = useState('desc');
   const [secret, setSecret] = useState(() => localStorage.getItem('adminSecret') || '');
@@ -217,10 +218,11 @@ const Admin = () => {
     if (!currentSecret) return;
     try {
       const headers = { 'X-Admin-Key': currentSecret };
-      const [statsRes, providersRes, usersRes] = await Promise.all([
+      const [statsRes, providersRes, usersRes, logsRes] = await Promise.all([
         fetch(`${API_BASE}/v1/admin/stats`, { headers }),
         fetch(`${API_BASE}/v1/admin/providers`, { headers }),
-        fetch(`${API_BASE}/v1/admin/users`, { headers })
+        fetch(`${API_BASE}/v1/admin/users`, { headers }),
+        fetch(`${API_BASE}/v1/admin/logs?per_page=50`, { headers })
       ]);
 
       if (statsRes.status === 403 || providersRes.status === 403) {
@@ -265,6 +267,10 @@ const Admin = () => {
         if (usersRes && usersRes.ok) {
           const usersJson = await usersRes.json();
           setUsersData(usersJson.users || []);
+        }
+        if (logsRes && logsRes.ok) {
+          const logsJson = await logsRes.json();
+          setLogsData(logsJson.logs || []);
         }
       }
     } catch (error) {
@@ -393,7 +399,7 @@ const Admin = () => {
         <div className="flex items-center gap-6">
           <div className="hidden md:flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/5">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60">Global Routing: Optimal</span>
+            <span className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60">Routing: {stats?.providers ? Object.values(stats.providers).filter(p => !p.on_cooldown).length : 0} active</span>
           </div>
           <button onClick={handleLogout} className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 hover:text-[var(--accent)] transition-colors">
             End Session
@@ -484,55 +490,39 @@ const Admin = () => {
             </div>
           </div>
 
-          {/* Console / System Logs */}
+          {/* Console / Real Request Logs */}
           <div className="glass rounded-premium p-8 flex flex-col relative overflow-hidden h-[600px]">
             <div className="flex items-center gap-3 mb-8">
               <Terminal className="w-6 h-6 text-[var(--accent)]" />
-              <h2 className="text-3xl tracking-tight">Console</h2>
+              <h2 className="text-3xl tracking-tight">Request Log</h2>
             </div>
 
             <div className="flex-1 bg-[#050505] rounded-[2rem] p-6 data-mono text-[10px] overflow-hidden relative border border-white/5">
               <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-[#050505] to-transparent z-10 pointer-events-none"></div>
-              <div className="space-y-4 text-[var(--bg-light)]/50 leading-relaxed overflow-y-auto h-full pr-2">
-                <div className="flex gap-3">
-                  <span className="text-[var(--accent)]/60 shrink-0">[14:42:01]</span>
-                  <p><span className="text-[var(--accent)]">SYS_INIT:</span> Nexus Routing Protocol v2.4.0 active.</p>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-[var(--accent)]/60 shrink-0">[14:42:05]</span>
-                  <p><span className="text-[var(--accent)]">ROUTING:</span> Balanced to Groq_LLama_3.3_70b.</p>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-yellow-500/60 shrink-0">[14:42:12]</span>
-                  <p><span className="text-yellow-500">LATENCY:</span> Jitter on OpenRouter endpoint.</p>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-[var(--accent)]/60 shrink-0">[14:42:13]</span>
-                  <p><span className="text-[var(--accent)]">ADJUST:</span> Re-weighting provider chain.</p>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-[var(--accent)]/60 shrink-0">[14:42:15]</span>
-                  <p><span className="text-[var(--accent)]">SECURITY:</span> HMAC verified for session 9x8f.</p>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-emerald-500/60 shrink-0">[14:42:21]</span>
-                  <p><span className="text-emerald-500">HEALTH:</span> Heartbeat confirmed for all nodes.</p>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-[var(--bg-light)]/20 shrink-0">[14:42:30]</span>
-                  <p>Awaiting incoming neural signals...</p>
-                </div>
+              <div className="space-y-3 text-[var(--bg-light)]/50 leading-relaxed overflow-y-auto h-full pr-2">
+                {(logsData || []).length === 0 ? (
+                  <div className="text-center py-20 text-white/20">No request logs yet</div>
+                ) : (logsData || []).map((log, i) => (
+                  <div key={log.id || i} className="flex gap-3">
+                    <span className="text-[var(--bg-light)]/20 shrink-0">[{log.created_at ? new Date(log.created_at).toLocaleTimeString([], {hour12: false}) : '--:--'}]</span>
+                    <p>
+                      <span className={log.status === 'success' ? 'text-emerald-400' : 'text-red-400'}>{(log.provider || '?').toUpperCase()}:</span>
+                      {' '}{log.model || 'unknown'} — {log.tokens_in || 0}↓ {log.tokens_out || 0}↑ — {Math.round(log.latency_ms || 0)}ms — ${(log.cost_usd || 0).toFixed(4)}
+                      {log.status !== 'success' && log.error_msg && <span className="text-red-400/60 ml-2">[{log.error_msg.slice(0, 50)}]</span>}
+                    </p>
+                  </div>
+                ))}
               </div>
               <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-[#050505] to-transparent z-10 pointer-events-none"></div>
             </div>
 
             <div className="mt-6 p-6 bg-white/5 border border-white/5 rounded-3xl">
               <div className="data-mono text-[10px] text-[var(--bg-light)]/40 uppercase tracking-widest mb-3 flex justify-between">
-                <span>Matrix Integrity</span>
-                <span className="text-emerald-400">99.9%</span>
+                <span>Success Rate</span>
+                <span className="text-emerald-400">{(() => { const fb = stats?.failover_breakdown || {}; let s = 0, t = 0; Object.values(fb).forEach(v => { s += v.success; t += v.success + v.error; }); return t > 0 ? (s / t * 100).toFixed(1) + '%' : 'N/A'; })()}</span>
               </div>
               <div className="h-1 bg-black/40 rounded-full overflow-hidden">
-                <div className="h-full bg-[var(--accent)] w-full"></div>
+                <div className="h-full bg-[var(--accent)] transition-all duration-1000" style={{width: (() => { const fb = stats?.failover_breakdown || {}; let s = 0, t = 0; Object.values(fb).forEach(v => { s += v.success; t += v.success + v.error; }); return t > 0 ? `${(s / t * 100)}%` : '0%'; })()}}></div>
               </div>
             </div>
           </div>
@@ -703,6 +693,8 @@ const Admin = () => {
               </div>
             )}
           </div>
+        </div>
+
         {/* ═══════ MODEL BREAKDOWN ═══════ */}
         <div className="admin-reveal mt-12">
           <div className="mb-8">
@@ -746,7 +738,21 @@ const Admin = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="glass rounded-premium p-8">
               <div className="flex items-center gap-3 mb-6"><DollarSign className="w-6 h-6 text-[var(--accent)]" /><h3 className="text-2xl tracking-tight">Daily Budget</h3></div>
-              {(() => { const limit = stats?.budget_limit_usd || 0; const spent = stats?.total_cost_usd || 0; const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0; return (<div><div className="flex justify-between mb-3"><span className="data-mono text-xs text-white/50">Spent Today</span><span className="data-mono text-xs text-white/50">{limit > 0 ? `Limit: $${limit.toFixed(2)}` : 'Unlimited'}</span></div><div className="text-4xl font-black text-[var(--accent)] mb-4">${spent.toFixed(4)}</div>{limit > 0 && (<div><div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5"><div className={`h-full rounded-full transition-all duration-1000 ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} style={{width: `${pct}%`}}></div></div><div className="data-mono text-[9px] text-white/30 mt-2 text-right">{pct.toFixed(1)}% used</div></div>)}</div>); })()}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <span className="data-mono text-xs text-white/50">Spent Today</span>
+                  <span className="data-mono text-xs text-white/50">{(stats?.budget_limit_usd || 0) > 0 ? `Limit: $${(stats?.budget_limit_usd || 0).toFixed(2)}` : 'Unlimited'}</span>
+                </div>
+                <div className="text-4xl font-black text-[var(--accent)] mb-4">${(stats?.total_cost_usd || 0).toFixed(4)}</div>
+                {(stats?.budget_limit_usd || 0) > 0 && (
+                  <div>
+                    <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5">
+                      <div className={`h-full rounded-full transition-all duration-1000 ${Math.min(((stats?.total_cost_usd || 0) / (stats?.budget_limit_usd || 1)) * 100, 100) > 80 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${Math.min(((stats?.total_cost_usd || 0) / (stats?.budget_limit_usd || 1)) * 100, 100)}%`}}></div>
+                    </div>
+                    <div className="data-mono text-[9px] text-white/30 mt-2 text-right">{Math.min(((stats?.total_cost_usd || 0) / (stats?.budget_limit_usd || 1)) * 100, 100).toFixed(1)}% used</div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="glass rounded-premium p-8">
               <div className="flex items-center gap-3 mb-6"><Zap className="w-6 h-6 text-[var(--accent)]" /><h3 className="text-2xl tracking-tight">Cost Rates (/1M tokens)</h3></div>
