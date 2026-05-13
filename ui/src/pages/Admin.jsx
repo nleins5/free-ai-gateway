@@ -415,7 +415,7 @@ const Admin = () => {
               System <span className="font-drama text-[var(--accent)]">Telemetry.</span>
             </h1>
             <p className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40 flex items-center gap-3">
-              ROUTER_ID: NX-8000-PRIMARY <span className="w-1 h-1 rounded-full bg-white/20"></span> {currentTime.toLocaleTimeString([], { hour12: false })}
+              MODE: {stats?.providers ? 'WEIGHTED' : '---'} <span className="w-1 h-1 rounded-full bg-white/20"></span> {currentTime.toLocaleTimeString([], { hour12: false })}
             </p>
           </div>
           <MagneticButton variant="glass" className="py-3 px-6 text-xs whitespace-nowrap">
