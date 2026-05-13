@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Sparkles, Code2, Image as ImageIcon, Search, Settings, ArrowLeft, Zap, X } from 'lucide-react';
+import { Send, Mic, Sparkles, Code2, Image as ImageIcon, Search, Settings, ArrowLeft, Zap, X, Box } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -92,12 +92,6 @@ const Chat = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!input.trim() || !userId) return;
-        
-        // Limits disabled
-        // if (promptCount >= 100) {
-        //     setShowModal(true);
-        //     return;
-        // }
 
         const userMsg = { role: 'user', content: input };
         setMessages(prev => [...prev, userMsg]);
@@ -123,10 +117,11 @@ const Chat = () => {
                     })
                 });
             }
-            
+
+            // 402 = Free tier exhausted → force login
             if (res.status === 402) {
+                setMessages(prev => prev.slice(0, -1)); // Remove unanswered user msg
                 setShowModal(true);
-                setMessages(prev => prev.slice(0, -1)); // Remove user message if not sent
                 return;
             }
 
@@ -136,11 +131,6 @@ const Chat = () => {
                 const newCount = promptCount + 1;
                 setPromptCount(newCount);
                 localStorage.setItem('prompt_count', newCount.toString());
-
-                if (newCount === 10 && currentTier === 'vip') {
-                    setToast('VIP Credits exhausted. Transitioning to Free AI tier for the next 90 prompts.');
-                    setCurrentTier('general');
-                }
                 
                 if (mode === 'image') {
                     setMessages(prev => [...prev, {
@@ -151,30 +141,52 @@ const Chat = () => {
                         latency: 1500
                     }]);
                 } else {
-                    const isVip = newCount <= 10;
                     setMessages(prev => [...prev, {
                         role: 'assistant',
                         content: data.answer,
-                        provider: isVip ? (data.metadata?.provider || 'GPT-4o (VIP)') : 'Llama 3 (General)',
-                        latency: data.metadata?.latency_ms ? Math.round(data.metadata.latency_ms) : (isVip ? 450 : 85)
+                        provider: data.metadata?.provider_name || data.metadata?.provider || 'AI Gateway',
+                        latency: data.metadata?.latency_ms ? Math.round(data.metadata.latency_ms) : null
                     }]);
                 }
             } else {
-                const err = await res.json();
+                // Double-check for 402 (safety net for cached JS)
+                if (res.status === 402) {
+                    setMessages(prev => prev.slice(0, -1));
+                    setShowModal(true);
+                    return;
+                }
+                
+                // Parse error detail - could be JSON object or string
+                let errorMsg = `Server Error ${res.status}`;
+                try {
+                    const err = await res.json();
+                    if (typeof err.detail === 'string') {
+                        errorMsg = err.detail;
+                    } else if (err.detail?.message) {
+                        errorMsg = err.detail.message;
+                    } else if (err.error) {
+                        errorMsg = err.error;
+                    }
+                } catch {
+                    errorMsg = res.statusText || errorMsg;
+                }
+                
                 setMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: `Error: ${err.detail || res.statusText}`,
+                    content: `⚠️ ${errorMsg}`,
                     provider: 'System',
                     latency: 0
                 }]);
+                setToast(errorMsg);
             }
         } catch (error) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `Error: ${error.message}`,
+                content: `⚠️ Lỗi kết nối: ${error.message}. Hãy kiểm tra server đang chạy.`,
                 provider: 'System',
                 latency: 0
             }]);
+            setToast(`Lỗi kết nối: ${error.message}`);
         }
     };
 
@@ -356,6 +368,7 @@ const Chat = () => {
         { id: 'research', icon: Search, label: 'Research' },
         { id: 'code', icon: Code2, label: 'Code' },
         { id: 'image', icon: ImageIcon, label: 'Image' },
+        { id: 'omniverse', icon: Box, label: 'Omniverse 3D' },
     ];
 
     return (

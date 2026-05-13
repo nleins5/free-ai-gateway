@@ -5,7 +5,9 @@
     "sambanova", "cloudflare", "openrouter", "xai", "together", "claude", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom", "freetheai"
   ],
   "task_tiers": {
-    "general":   ["groq", "gemini", "github", "huggingface", "cloudflare"],
+    "general":   ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
+    "chat":      ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
+    "research":  ["groq", "gemini", "github", "nvidia", "nvidia_77", "huggingface"],
     "chat_faq":  ["groq", "gemini", "cloudflare", "huggingface"],
     "summarize": ["groq", "cerebras", "gemini", "cloudflare"],
     "rewrite":   ["gemini", "groq", "cloudflare"],
@@ -16,7 +18,8 @@
     "rag":       ["groq", "gemini", "github", "huggingface", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom"],
     "vision":    ["github", "gemini"],
     "image":     ["cloudflare", "huggingface", "freetheai"],
-    "gemma":     ["groq", "gemini", "openrouter", "huggingface", "cloudflare"]
+    "gemma":     ["groq", "gemini", "openrouter", "huggingface", "cloudflare"],
+    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq"]
   },
   "provider_weights": {
     "groq": 3,

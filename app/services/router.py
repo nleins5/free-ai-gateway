@@ -1,6 +1,7 @@
 import os
 import time
 import random
+import logging
 import httpx
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import HTTPException
@@ -12,6 +13,8 @@ from app.config import (
 )
 from app.core.providers import PROVIDER_REGISTRY, Provider
 from app.core.state import StateStore
+
+logger = logging.getLogger(__name__)
 
 class RouterService:
     def __init__(self, state_store: StateStore):
@@ -33,8 +36,8 @@ class RouterService:
         if provider.key == "ollama":
             return os.getenv(provider.api_key_env, "ollama")
         if provider.key == "github":
-            return os.getenv(provider.api_key_env) or os.getenv("GITHUB_PAT") or ""
-        return os.getenv(provider.api_key_env) or ""
+            return os.getenv(provider.api_key_env) or os.getenv("GITHUB_PAT") or "not_provided"
+        return os.getenv(provider.api_key_env) or "not_provided"
 
     def _get_base_url(self, provider: Provider) -> str:
         if provider.key == "cloudflare":
@@ -75,13 +78,35 @@ class RouterService:
             return []
 
         if ROUTING_MODE == "weighted":
-            # Sort by effective weight
+            # Weighted random shuffle — distributes traffic proportionally
+            # instead of always picking the highest-weight provider.
+            # E.g. Groq(3) vs NVIDIA(2) → Groq gets ~60%, NVIDIA ~40% as primary.
             scored = []
             for p in available:
                 base_w = settings.dynamic_weights.get(p.key, 100)
-                scored.append((self.state_store.get_effective_weight(p.key, base_w), p))
-            scored.sort(key=lambda x: x[0], reverse=True)
-            return [x[1] for x in scored]
+                eff_w = self.state_store.get_effective_weight(p.key, base_w)
+                scored.append((eff_w, p))
+            
+            # Weighted shuffle: pick providers one by one based on their weight
+            shuffled = []
+            remaining = list(scored)
+            while remaining:
+                total = sum(w for w, _ in remaining)
+                if total <= 0:
+                    # Fallback: append rest in original order
+                    shuffled.extend([p for _, p in remaining])
+                    break
+                r = random.random() * total
+                cumulative = 0.0
+                for i, (w, p) in enumerate(remaining):
+                    cumulative += w
+                    if cumulative >= r:
+                        shuffled.append(p)
+                        remaining.pop(i)
+                        break
+            
+            logger.info(f"Weighted shuffle order: {[p.key for p in shuffled]}")
+            return shuffled
         elif ROUTING_MODE == "round_robin":
             idx = self.state_store.increment_rr() % len(available)
             return available[idx:] + available[:idx]
@@ -99,30 +124,47 @@ class RouterService:
         task: Optional[str] = "general",
     ) -> Tuple[Any, Dict[str, Any]]:
         
+        if task == "omniverse":
+            sys_msg = {
+                "role": "system",
+                "content": "You are an expert NVIDIA Omniverse and OpenUSD developer. Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, and assist with 3D scene creation using Omniverse Kit. Always provide clean, functional Python code when requested."
+            }
+            if messages and messages[0].get("role") == "system":
+                messages[0]["content"] += "\n" + sys_msg["content"]
+            else:
+                messages.insert(0, sys_msg)
+
         if self.state_store.get_total_cost() >= settings.budget_daily_limit_usd > 0:
             raise HTTPException(
                 status_code=429,
                 detail=f"Daily budget limit of ${settings.budget_daily_limit_usd:.2f} exceeded."
             )
 
+        # Track user prompt count and enforce free tier limit
         if user_id:
             prompt_count = self.state_store.get_user_prompts(user_id)
-            if prompt_count >= 9999:
+            if prompt_count >= 10:
                 raise HTTPException(
                     status_code=402,
-                    detail={"message": "Out of credits. Please subscribe."}
+                    detail="Bạn đã sử dụng hết 10 lượt miễn phí. Vui lòng đăng nhập để tiếp tục."
                 )
-            elif prompt_count < 9990:
-                task = "vip"
-            else:
-                task = "general"
             self.state_store.increment_user_prompt(user_id)
+            logger.info(f"User {user_id[:8]}... prompt #{prompt_count + 1}/10, task={task}")
 
-        chain = settings.task_tiers.get(task or "general", settings.provider_chain)
+        # Resolve task tier → provider chain
+        # Keep user's chosen task mode (chat/code/research/general) intact
+        resolved_task = task or "general"
+        chain = settings.task_tiers.get(resolved_task, None)
+        if chain is None:
+            # Unknown task tier → fallback to "general" tier, then full chain
+            chain = settings.task_tiers.get("general", settings.provider_chain)
+            logger.warning(f"Unknown task tier '{resolved_task}', falling back to general")
+        
         providers = self._get_ordered_providers(chain)
         
         if not providers:
             # Fallback to entire registry if everything is on cooldown or invalid
+            logger.warning("All providers in chain on cooldown, falling back to full registry")
             providers = [p for p in PROVIDER_REGISTRY.values() if not self.state_store.is_on_cooldown(p.key)]
             if not providers:
                 raise HTTPException(status_code=502, detail="All providers are currently on cooldown or inactive.")
@@ -160,13 +202,15 @@ class RouterService:
                         "provider": provider.key,
                         "provider_name": provider.name,
                         "model": model,
-                        "latency_ms": round(latency, 2)
+                        "latency_ms": round(latency, 2),
+                        "failover_trace": errors
                     }
                     return response, meta
                 except Exception as exc:
                     latency = (time.perf_counter() - start_time) * 1000.0
                     self.state_store.record_latency(provider.key, latency)
                     last_error = exc
+                    logger.warning(f"Provider {provider.key} attempt {attempt+1} failed: {exc}")
                     if not self._is_retryable(exc):
                         break
             
@@ -174,8 +218,11 @@ class RouterService:
                 self.state_store.mark_failure(provider.key, str(last_error))
                 errors.append({"provider": provider.key, "error": str(last_error)})
 
+        # Build a human-readable error summary
+        error_summary = "; ".join([f"{e['provider']}: {str(e['error'])[:80]}" for e in errors[:5]])
+        logger.error(f"All {len(errors)} providers failed for task={resolved_task}. Errors: {error_summary}")
         raise HTTPException(
             status_code=502,
-            detail={"message": "All upstream providers failed", "errors": errors},
+            detail=f"All upstream providers failed. Tried {len(errors)} providers. Last errors: {error_summary}",
         )
 # router_service removed, initialized in app.main

@@ -50,11 +50,14 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
 # These are loaded from providers.json and updated via reload_config()
 _DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github,cerebras,huggingface,sambanova,groq,gemini,cloudflare,openrouter,freetheai").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["github", "huggingface", "groq", "gemini", "cloudflare"],
-    "code": ["github", "huggingface", "cerebras", "groq"],
+    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
+    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
+    "research": ["groq", "gemini", "github", "nvidia", "nvidia_77", "huggingface"],
+    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77"],
     "vision": ["github", "gemini"],
     "image": ["cloudflare", "huggingface", "freetheai"],
-    "gemma": ["groq", "openrouter", "huggingface"]
+    "gemma": ["groq", "openrouter", "huggingface"],
+    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq"]
 }
 
 class Settings:

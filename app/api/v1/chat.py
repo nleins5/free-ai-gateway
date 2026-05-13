@@ -20,11 +20,13 @@ async def _resolve_user(api_key: Optional[str], db: AsyncSession):
     return result.scalar_one_or_none()
 
 
-async def _log_request(db: AsyncSession, user_id, provider, model, tokens_in, tokens_out, latency_ms, cost_usd, task, status="success", error_msg=None):
+async def _log_request(db: AsyncSession, user_id, provider, model, tokens_in, tokens_out, latency_ms, cost_usd, task, failover_trace=None, status="success", error_msg=None):
+    import json
     log = RequestLog(
         user_id=user_id,
         provider=provider,
         model=model,
+        failover_trace=json.dumps(failover_trace) if failover_trace else None,
         tokens_in=tokens_in,
         tokens_out=tokens_out,
         latency_ms=latency_ms,
@@ -70,6 +72,7 @@ async def chat_completions(
         tokens_in=t_in, tokens_out=t_out,
         latency_ms=meta["latency_ms"], cost_usd=cost,
         task="general",
+        failover_trace=meta.get("failover_trace"),
     )
 
     # Wrap response with gateway metadata
@@ -145,6 +148,7 @@ async def unified_chat(
         tokens_in=t_in, tokens_out=t_out,
         latency_ms=meta["latency_ms"], cost_usd=cost,
         task=req.task or "general",
+        failover_trace=meta.get("failover_trace"),
     )
 
     # 4. Save to conversation if provided
@@ -161,12 +165,14 @@ async def unified_chat(
                 content=req.query,
             ))
             # Save assistant response
+            import json
             db.add(ChatMessage(
                 conversation_id=conv.id,
                 role="assistant",
                 content=answer,
                 provider=meta["provider"],
                 model=meta["model"],
+                failover_trace=json.dumps(meta.get("failover_trace")) if meta.get("failover_trace") else None
             ))
 
     return {

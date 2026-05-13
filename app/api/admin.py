@@ -43,13 +43,22 @@ async def get_gateway_stats(request: Request, db: AsyncSession = Depends(get_db)
     user_count = await db.execute(select(func.count(User.id)))
     total_users = user_count.scalar() or 0
     
-    # Total requests all-time
-    total_result = await db.execute(select(func.count(RequestLog.id)))
-    total_requests = total_result.scalar() or 0
+    # Total requests and tokens all-time
+    total_result = await db.execute(
+        select(
+            func.count(RequestLog.id).label("count"),
+            func.coalesce(func.sum(RequestLog.tokens_in), 0).label("tokens_in"),
+            func.coalesce(func.sum(RequestLog.tokens_out), 0).label("tokens_out"),
+        )
+    )
+    total_data = total_result.first()
+    total_requests = total_data.count if total_data else 0
+    total_tokens_alltime = (int(total_data.tokens_in) + int(total_data.tokens_out)) if total_data else 0
     
     realtime["db_stats"] = db_providers
     realtime["total_users"] = total_users
     realtime["total_requests_alltime"] = total_requests
+    realtime["total_tokens_alltime"] = total_tokens_alltime
     return realtime
 
 

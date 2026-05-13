@@ -50,6 +50,7 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     provider = Column(String(50), nullable=True)
     model = Column(String(100), nullable=True)
+    failover_trace = Column(Text, nullable=True)  # Stores JSON string of failed attempts
     created_at = Column(DateTime(timezone=True), default=_now)
 
     conversation = relationship("Conversation", back_populates="messages")
@@ -66,6 +67,7 @@ class RequestLog(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     provider = Column(String(50), nullable=False)
     model = Column(String(100), nullable=True)
+    failover_trace = Column(Text, nullable=True)  # Stores JSON string of failed attempts
     tokens_in = Column(Integer, default=0)
     tokens_out = Column(Integer, default=0)
     latency_ms = Column(Float, default=0.0)

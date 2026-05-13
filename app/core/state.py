@@ -95,8 +95,17 @@ class StateStore:
         if ewma_latency <= 0:
             latency_multiplier = 1.0
         else:
-            latency_multiplier = max(0.2, min(2.0, 800.0 / ewma_latency))
-        return max(0.1, float(base_weight) * error_multiplier * latency_multiplier)
+            # Dampened latency bonus — use sqrt to flatten the curve.
+            # Fast providers still get a boost but won't monopolize traffic.
+            # Cap at 1.5x (was 2.0x) so a 200ms provider only gets 1.5x, not 4x.
+            raw = 600.0 / ewma_latency
+            latency_multiplier = max(0.4, min(1.5, raw ** 0.5))
+
+        # Penalize providers with many inflight requests (load spreading)
+        inflight = int(state.get("inflight", 0))
+        inflight_penalty = max(0.5, 1.0 - (inflight * 0.15))
+
+        return max(0.1, float(base_weight) * error_multiplier * latency_multiplier * inflight_penalty)
 
     def record_usage(self, provider_key: str, tokens_in: int = 0, tokens_out: int = 0) -> None:
         self._ensure_daily_reset()

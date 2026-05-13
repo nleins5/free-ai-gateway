@@ -242,14 +242,16 @@ const Admin = () => {
         setStats(statsData);
 
         const mappedProviders = providersList.providers.map(p => {
-          const pStats = statsData.providers[p.key] || {};
-          const latency = pStats.latency_ewma_ms || 0;
-          const requests = (pStats.today && pStats.today.requests) || 0;
+          const pState = statsData.providers[p.key] || {};
+          const pUsage = statsData.daily_usage[p.key] || {};
+          
+          const latency = pState.latency_ewma_ms || 0;
+          const requests = pUsage.requests || 0;
           const weight = p.in_chain ? 1.0 / providersList.chain_order.length : 0;
 
           return {
             name: p.name,
-            status: p.active ? 'active' : 'inactive',
+            status: pState.on_cooldown ? 'cooldown' : (p.active ? 'active' : 'inactive'),
             latency: Math.round(latency),
             weight: weight,
             usage: requests,
@@ -421,25 +423,25 @@ const Admin = () => {
           <MetricCard
             title="Neural Load"
             value={stats ? (stats.total_requests_alltime || 0).toLocaleString() : "---"}
-            subValue="Requests routed today"
+            subValue="Requests routed all-time"
             icon={Cpu}
-            trend={12.4}
+            trend={null}
           />
           <MetricCard
-            title="Signal Latency"
-            value={stats ? `${Math.round(Object.values(stats.providers || {}).reduce((acc, p) => acc + (p.latency_ewma_ms || 0), 0) / Math.max(1, Object.keys(stats.providers || {}).length))}ms` : "---"}
-            subValue="Network weighted avg"
-            icon={Zap}
-            trend={-8.2}
+            title="Token Volume"
+            value={stats ? (stats.total_tokens_alltime || 0).toLocaleString() : "---"}
+            subValue="Total tokens processed"
+            icon={TrendingUp}
+            trend={null}
           />
           <MetricCard
             title="Token Economy"
             value={stats ? `$${stats.total_cost_usd.toFixed(4)}` : "---"}
             subValue={stats && stats.budget_limit_usd > 0 ? `Quota: $${stats.budget_limit_usd}` : "Unlimited Tier"}
             icon={DollarSign}
-            trend={2.1}
+            trend={null}
           />
-                    <MetricCard
+          <MetricCard
             title="Active Nodes"
             value={stats ? `${providersData.filter(p => p.status === 'active').length}/${providersData.length}` : "0/0"}
             subValue="Current chain density"
