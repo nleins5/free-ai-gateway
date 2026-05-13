@@ -15,8 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 COPY providers.json .
-COPY .env .
-COPY .rag_store.json* ./
 
 # Build frontend UI
 COPY ui/ ./ui/
