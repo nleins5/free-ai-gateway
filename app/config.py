@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 import aiofiles
 
