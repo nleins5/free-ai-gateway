@@ -703,6 +703,73 @@ const Admin = () => {
               </div>
             )}
           </div>
+        {/* ═══════ MODEL BREAKDOWN ═══════ */}
+        <div className="admin-reveal mt-12">
+          <div className="mb-8">
+            <h2 className="text-4xl md:text-5xl tracking-tighter mb-2">Model <span className="font-drama text-[var(--accent)]">Breakdown.</span></h2>
+            <p className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40">Per-model token usage and cost</p>
+          </div>
+          <div className="glass rounded-premium p-8 md:p-10 overflow-hidden">
+            <div className="flex data-mono text-[10px] text-[var(--bg-light)]/40 mb-4 px-6 uppercase tracking-widest border-b border-white/5 pb-4">
+              <div className="w-[25%]">Model</div>
+              <div className="w-[15%] text-center">Provider</div>
+              <div className="w-[10%] text-center">Reqs</div>
+              <div className="w-[15%] text-center">Tok In</div>
+              <div className="w-[15%] text-center">Tok Out</div>
+              <div className="w-[10%] text-center">Latency</div>
+              <div className="w-[10%] text-right">Cost</div>
+            </div>
+            <div className="space-y-1 max-h-[400px] overflow-y-auto pr-2">
+              {(stats?.model_breakdown || []).length === 0 ? (
+                <div className="text-center py-16 text-white/20 data-mono text-xs">No model data yet</div>
+              ) : (stats?.model_breakdown || []).map((m, i) => (
+                <div key={i} className="flex items-center py-4 border-b border-white/5 last:border-0 hover:bg-white/5 px-6 -mx-6 rounded-2xl transition-all group">
+                  <div className="w-[25%] font-bold text-white group-hover:text-[var(--accent)] transition-colors text-sm truncate">{m.model || 'unknown'}</div>
+                  <div className="w-[15%] text-center"><span className="data-mono text-[9px] uppercase px-2 py-1 rounded-full border border-white/10 text-white/50 bg-white/5">{m.provider}</span></div>
+                  <div className="w-[10%] text-center data-mono text-sm text-white/80">{m.requests.toLocaleString()}</div>
+                  <div className="w-[15%] text-center data-mono text-xs text-emerald-400/70">{m.tokens_in.toLocaleString()}</div>
+                  <div className="w-[15%] text-center data-mono text-xs text-blue-400/70">{m.tokens_out.toLocaleString()}</div>
+                  <div className="w-[10%] text-center"><span className={`data-mono text-xs px-2 py-0.5 rounded-full border ${m.avg_latency_ms < 300 ? 'border-emerald-500/20 text-emerald-400' : m.avg_latency_ms < 800 ? 'border-yellow-500/20 text-yellow-400' : 'border-red-500/20 text-red-400'}`}>{Math.round(m.avg_latency_ms)}ms</span></div>
+                  <div className={`w-[10%] text-right data-mono text-sm font-bold ${m.cost_usd > 0.01 ? 'text-[var(--accent)]' : 'text-white/50'}`}>${m.cost_usd.toFixed(4)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════ QUOTA & COST RATES ═══════ */}
+        <div className="admin-reveal mt-12">
+          <div className="mb-8">
+            <h2 className="text-4xl md:text-5xl tracking-tighter mb-2">Quota <span className="font-drama text-[var(--accent)]">Monitor.</span></h2>
+            <p className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40">Daily budget and cost rate per provider</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="glass rounded-premium p-8">
+              <div className="flex items-center gap-3 mb-6"><DollarSign className="w-6 h-6 text-[var(--accent)]" /><h3 className="text-2xl tracking-tight">Daily Budget</h3></div>
+              {(() => { const limit = stats?.budget_limit_usd || 0; const spent = stats?.total_cost_usd || 0; const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0; return (<div><div className="flex justify-between mb-3"><span className="data-mono text-xs text-white/50">Spent Today</span><span className="data-mono text-xs text-white/50">{limit > 0 ? `Limit: $${limit.toFixed(2)}` : 'Unlimited'}</span></div><div className="text-4xl font-black text-[var(--accent)] mb-4">${spent.toFixed(4)}</div>{limit > 0 && (<div><div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5"><div className={`h-full rounded-full transition-all duration-1000 ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} style={{width: `${pct}%`}}></div></div><div className="data-mono text-[9px] text-white/30 mt-2 text-right">{pct.toFixed(1)}% used</div></div>)}</div>); })()}
+            </div>
+            <div className="glass rounded-premium p-8">
+              <div className="flex items-center gap-3 mb-6"><Zap className="w-6 h-6 text-[var(--accent)]" /><h3 className="text-2xl tracking-tight">Cost Rates (/1M tokens)</h3></div>
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2">
+                {Object.entries(stats?.cost_rates || {}).filter(([,v]) => v.input > 0 || v.output > 0).map(([key, rate]) => (<div key={key} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"><span className="font-bold text-white text-sm">{key}</span><div className="data-mono text-[10px] text-white/50"><span className="text-emerald-400/70">↓${rate.input}</span><span className="mx-2 text-white/10">|</span><span className="text-blue-400/70">↑${rate.output}</span></div></div>))}
+                {Object.entries(stats?.cost_rates || {}).filter(([,v]) => v.input > 0 || v.output > 0).length === 0 && (<div className="text-center py-8 text-white/20 data-mono text-xs">All providers are free-tier</div>)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════ FAILOVER TRACE ═══════ */}
+        <div className="admin-reveal mt-12">
+          <div className="mb-8">
+            <h2 className="text-4xl md:text-5xl tracking-tighter mb-2">Failover <span className="font-drama text-[var(--accent)]">Trace.</span></h2>
+            <p className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40">Success vs failure ratio — identifies weak links in the chain</p>
+          </div>
+          <div className="glass rounded-premium p-8 md:p-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(stats?.failover_breakdown || {}).map(([provider, data]) => { const total = data.success + data.error; const sr = total > 0 ? (data.success / total) * 100 : 0; return (<div key={provider} className="bg-white/5 rounded-3xl p-6 border border-white/5 hover:border-[var(--accent)]/20 transition-all"><div className="flex justify-between items-center mb-4"><span className="font-bold text-white tracking-tight">{provider}</span><span className={`data-mono text-xs font-bold ${sr > 90 ? 'text-emerald-400' : sr > 60 ? 'text-yellow-400' : 'text-red-400'}`}>{sr.toFixed(1)}%</span></div><div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5 mb-3"><div className={`h-full rounded-full ${sr > 90 ? 'bg-emerald-500' : sr > 60 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{width: `${sr}%`}}></div></div><div className="flex justify-between data-mono text-[9px] text-white/30"><span className="text-emerald-400/60">✓ {data.success}</span><span className="text-red-400/60">✗ {data.error}</span></div></div>); })}
+              {Object.keys(stats?.failover_breakdown || {}).length === 0 && (<div className="col-span-full text-center py-16 text-white/20 data-mono text-xs">No failover data recorded yet</div>)}
+            </div>
+          </div>
         </div>
       </div>
     </div>

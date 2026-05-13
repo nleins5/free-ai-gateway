@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
 from app.dependencies import verify_admin
-from app.config import settings, reload_config
+from app.config import settings, reload_config, COST_PER_1M
 from app.database import get_db
 from app.db_models import RequestLog, User
 
@@ -55,10 +55,56 @@ async def get_gateway_stats(request: Request, db: AsyncSession = Depends(get_db)
     total_requests = total_data.count if total_data else 0
     total_tokens_alltime = (int(total_data.tokens_in) + int(total_data.tokens_out)) if total_data else 0
     
+    # Per-model breakdown
+    model_stats = await db.execute(
+        select(
+            RequestLog.model,
+            RequestLog.provider,
+            func.count(RequestLog.id).label("requests"),
+            func.coalesce(func.sum(RequestLog.tokens_in), 0).label("tokens_in"),
+            func.coalesce(func.sum(RequestLog.tokens_out), 0).label("tokens_out"),
+            func.coalesce(func.sum(RequestLog.cost_usd), 0.0).label("cost"),
+            func.coalesce(func.avg(RequestLog.latency_ms), 0.0).label("avg_latency"),
+        ).group_by(RequestLog.model, RequestLog.provider)
+        .order_by(desc(func.count(RequestLog.id)))
+    )
+    model_breakdown = []
+    for row in model_stats.all():
+        model_breakdown.append({
+            "model": row.model,
+            "provider": row.provider,
+            "requests": row.requests,
+            "tokens_in": int(row.tokens_in),
+            "tokens_out": int(row.tokens_out),
+            "cost_usd": round(float(row.cost), 6),
+            "avg_latency_ms": round(float(row.avg_latency), 2),
+        })
+
+    # Failover trace stats (how often each provider was a fallback)
+    failover_stats = await db.execute(
+        select(
+            RequestLog.provider,
+            RequestLog.status,
+            func.count(RequestLog.id).label("count"),
+        ).group_by(RequestLog.provider, RequestLog.status)
+    )
+    failover_breakdown = {}
+    for row in failover_stats.all():
+        if row.provider not in failover_breakdown:
+            failover_breakdown[row.provider] = {"success": 0, "error": 0}
+        if row.status == "success":
+            failover_breakdown[row.provider]["success"] = row.count
+        else:
+            failover_breakdown[row.provider]["error"] += row.count
+
     realtime["db_stats"] = db_providers
+    realtime["model_breakdown"] = model_breakdown
+    realtime["failover_breakdown"] = failover_breakdown
     realtime["total_users"] = total_users
     realtime["total_requests_alltime"] = total_requests
     realtime["total_tokens_alltime"] = total_tokens_alltime
+    realtime["budget_limit_usd"] = settings.budget_daily_limit_usd
+    realtime["cost_rates"] = {k: {"input": v[0], "output": v[1]} for k, v in COST_PER_1M.items()}
     return realtime
 
 
