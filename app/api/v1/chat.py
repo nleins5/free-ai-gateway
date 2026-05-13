@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.models import ChatRequest, UnifiedAIChatRequest
 from app.dependencies import get_router_service, get_rag_service
@@ -16,7 +17,7 @@ router = APIRouter()
 async def _resolve_user(api_key: Optional[str], db: AsyncSession):
     if not api_key:
         return None
-    result = await db.execute(select(User).where(User.api_key == api_key, User.is_active == True))
+    result = await db.execute(select(User).where(User.api_key == api_key, User.is_active))
     return result.scalar_one_or_none()
 
 
@@ -112,13 +113,29 @@ async def unified_chat(
             await db.refresh(user)
     messages = []
     
-    # 1. Handle RAG if requested
+    # 1. Handle Web Search (Research Mode) if requested
     if req.use_rag:
-        context_docs = rag_svc.search(req.query, top_k=4)
-        if context_docs:
-            context_str = "\n\n".join([d["content"] for d in context_docs])
-            system_prompt = req.system_prompt or "You are a helpful assistant. Use the following context to answer the user's question."
-            messages.append({"role": "system", "content": f"{system_prompt}\n\nContext:\n{context_str}"})
+        def perform_web_search(q):
+            try:
+                from ddgs import DDGS
+                with DDGS() as ddgs:
+                    return ddgs.text(q, max_results=3)
+            except Exception as e:
+                import logging
+                logging.error(f"Web search failed: {e}")
+                return []
+        
+        search_results = await run_in_threadpool(perform_web_search, req.query)
+        if search_results:
+            context_str = ""
+            for idx, res in enumerate(search_results):
+                context_str += f"[{idx+1}] {res.get('title')}\nURL: {res.get('href')}\nSnippet: {res.get('body')}\n\n"
+            
+            system_prompt = req.system_prompt or "You are a helpful research assistant. Use the following web search results to answer the user's question accurately. Always cite your sources using the [Number] format in your response."
+            messages.append({"role": "system", "content": f"{system_prompt}\n\n--- Web Search Results ---\n{context_str}"})
+        else:
+            system_prompt = req.system_prompt or "You are a helpful assistant."
+            messages.append({"role": "system", "content": system_prompt})
     elif req.system_prompt:
         messages.append({"role": "system", "content": req.system_prompt})
 

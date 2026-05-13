@@ -9,7 +9,7 @@ load_dotenv()
 # --- CONSTANTS ---
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "changeme")
 PROVIDERS_JSON_PATH = os.getenv("PROVIDERS_JSON_PATH", "providers.json")
-REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "30"))
+REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "15"))
 IMAGE_MAX_WAIT_MS = max(int(os.getenv("IMAGE_MAX_WAIT_MS", "9500")), 1000)
 MAX_RETRIES_PER_PROVIDER = max(int(os.getenv("MAX_RETRIES_PER_PROVIDER", "1")), 0)
 PROVIDER_FAILURE_THRESHOLD = max(int(os.getenv("PROVIDER_FAILURE_THRESHOLD", "2")), 1)
@@ -52,7 +52,7 @@ _DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github
 _DEFAULT_TASK_TIERS = {
     "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
     "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
-    "research": ["groq", "gemini", "github", "nvidia", "nvidia_77", "huggingface"],
+    "research": ["github", "gemini", "claude", "xai", "nvidia"],
     "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77"],
     "vision": ["github", "gemini"],
     "image": ["cloudflare", "huggingface", "freetheai"],

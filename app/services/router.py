@@ -2,7 +2,6 @@ import os
 import time
 import random
 import logging
-import httpx
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import HTTPException
 from openai import AsyncOpenAI

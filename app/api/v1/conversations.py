@@ -14,6 +14,10 @@ class ConversationCreate(BaseModel):
     title: Optional[str] = "New Conversation"
 
 
+class ConversationUpdate(BaseModel):
+    title: str
+
+
 class ConversationOut(BaseModel):
     id: str
     title: str
@@ -125,6 +129,22 @@ async def get_conversation(
             for m in msgs
         ],
     }
+
+
+@router.put("/{conversation_id}")
+async def update_conversation(
+    conversation_id: str,
+    body: ConversationUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update conversation title."""
+    result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conv.title = body.title
+    return {"id": conv.id, "title": conv.title}
 
 
 @router.delete("/{conversation_id}")

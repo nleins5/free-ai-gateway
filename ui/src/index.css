@@ -12,6 +12,23 @@
     --text-dark: #1A1A1A;
     --text-ghost: rgba(250, 248, 245, 0.6);
     --border-glass: rgba(255, 255, 255, 0.08);
+
+    /* Dynamic Theme Colors (RGB format for Tailwind opacity) */
+    --color-void: 13 13 18;       /* #0D0D12 */
+    --color-sidebar: 13 13 18;    /* #0D0D12 */
+    --color-input: 42 42 53;      /* #2A2A35 (Graphite) */
+    --color-plasma: 201 168 76;   /* #C9A84C */
+    --color-ghost: 250 248 245;   /* #FAF8F5 */
+    --color-graphite: 42 42 53;   /* #2A2A35 */
+  }
+
+  .light-mode {
+    --color-void: 255 255 255;    /* #FFFFFF Pure white background */
+    --color-sidebar: 249 249 249; /* #F9F9F9 Light gray sidebar */
+    --color-input: 244 244 244;   /* #F4F4F4 Input background */
+    --color-plasma: 0 0 0;        /* #000000 Black accent */
+    --color-ghost: 13 13 13;      /* #0D0D0D Very dark text */
+    --color-graphite: 229 229 229;/* #E5E5E5 Light gray for borders and secondary bg */
   }
 
   body {

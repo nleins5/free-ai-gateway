@@ -18,7 +18,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         base_url="https://models.github.ai/inference",
         api_key_env="GITHUB_TOKEN",
         model_env="GITHUB_MODEL",
-        default_model="gpt-4o",
+        default_model="gpt-4o-mini",
     ),
     "openrouter": Provider(
         key="openrouter",
@@ -50,7 +50,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         base_url="https://generativelanguage.googleapis.com/v1beta/openai",
         api_key_env="GEMINI_API_KEY",
         model_env="GEMINI_MODEL",
-        default_model="gemini-1.5-pro",
+        default_model="gemini-flash-latest",
     ),
     "cerebras": Provider(
         key="cerebras",
@@ -106,7 +106,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         base_url="https://api.x.ai/v1",
         api_key_env="XAI_API_KEY",
         model_env="XAI_MODEL",
-        default_model="grok-beta",
+        default_model="grok-2",
     ),
     "claude": Provider(
         key="claude",
@@ -122,7 +122,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         base_url="https://integrate.api.nvidia.com/v1",
         api_key_env="NVIDIA_API_KEY",
         model_env="NVIDIA_MODEL",
-        default_model="meta/llama-3.1-405b-instruct",
+        default_model="meta/llama-3.1-70b-instruct",
     ),
     "nvidia_33": Provider(
         key="nvidia_33",

@@ -121,6 +121,7 @@ const ProviderRow = ({ name, status, latency, weight, usage, tasks }) => {
 };
 
 const UserRow = ({ user, maxRequests }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const usagePercent = maxRequests > 0 ? (user.request_count / maxRequests) * 100 : 0;
   const totalTokens = (user.tokens_in || 0) + (user.tokens_out || 0);
   const lastActive = user.last_active ? new Date(user.last_active) : null;
@@ -138,61 +139,96 @@ const UserRow = ({ user, maxRequests }) => {
   const isOnline = minutesAgo !== null && minutesAgo < 5;
 
   return (
-    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/5 px-6 -mx-6 rounded-2xl transition-all group">
-      <div className="flex items-center gap-4 w-[22%]">
-        <div className="relative">
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black uppercase ${user.role === 'admin' ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30' : 'bg-white/10 text-white/60 border border-white/10'}`}>
-            {user.username?.slice(0, 2) || '??'}
+    <div className="border-b border-white/5 last:border-0 -mx-6 px-6 transition-all">
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center justify-between py-4 hover:bg-white/5 rounded-2xl transition-all group cursor-pointer"
+      >
+        <div className="flex items-center gap-4 w-[22%]">
+          <div className="relative">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black uppercase ${user.role === 'admin' ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30' : 'bg-white/10 text-white/60 border border-white/10'}`}>
+              {user.username?.slice(0, 2) || '??'}
+            </div>
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--primary)] ${isOnline ? 'bg-emerald-500' : user.is_active ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
           </div>
-          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--primary)] ${isOnline ? 'bg-emerald-500' : user.is_active ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className="font-bold text-white group-hover:text-[var(--accent)] transition-colors tracking-tight truncate">{user.username}</span>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className={`data-mono text-[8px] uppercase px-1.5 py-0.5 rounded border ${user.role === 'admin' ? 'border-[var(--accent)]/30 text-[var(--accent)] bg-[var(--accent)]/5' : 'border-white/10 text-white/40 bg-white/5'}`}>{user.role}</span>
-            {!user.is_active && <span className="data-mono text-[8px] uppercase px-1.5 py-0.5 rounded border border-red-500/30 text-red-400 bg-red-500/5">Suspended</span>}
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-white group-hover:text-[var(--accent)] transition-colors tracking-tight truncate">{user.username}</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`data-mono text-[8px] uppercase px-1.5 py-0.5 rounded border ${user.role === 'admin' ? 'border-[var(--accent)]/30 text-[var(--accent)] bg-[var(--accent)]/5' : 'border-white/10 text-white/40 bg-white/5'}`}>{user.role}</span>
+              {!user.is_active && <span className="data-mono text-[8px] uppercase px-1.5 py-0.5 rounded border border-red-500/30 text-red-400 bg-red-500/5">Suspended</span>}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="w-[15%] text-center">
-        <div className="data-mono text-sm text-white/90 font-bold">{user.request_count.toLocaleString()}</div>
-        <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Requests</div>
-      </div>
+        <div className="w-[15%] text-center">
+          <div className="data-mono text-sm text-white/90 font-bold">{user.request_count.toLocaleString()}</div>
+          <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Requests</div>
+        </div>
 
-      <div className="w-[18%] text-center">
-        <div className="data-mono text-sm text-white/90">{totalTokens.toLocaleString()}</div>
-        <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">
-          <span className="text-emerald-400/60">↓{(user.tokens_in || 0).toLocaleString()}</span>
-          <span className="mx-1 text-white/10">|</span>
-          <span className="text-blue-400/60">↑{(user.tokens_out || 0).toLocaleString()}</span>
+        <div className="w-[18%] text-center">
+          <div className="data-mono text-sm text-white/90">{totalTokens.toLocaleString()}</div>
+          <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">
+            <span className="text-emerald-400/60">↓{(user.tokens_in || 0).toLocaleString()}</span>
+            <span className="mx-1 text-white/10">|</span>
+            <span className="text-blue-400/60">↑{(user.tokens_out || 0).toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div className="w-[15%] text-center">
+          <div className={`data-mono text-sm font-bold ${user.total_cost_usd > 1 ? 'text-[var(--accent)]' : user.total_cost_usd > 0 ? 'text-white/90' : 'text-white/30'}`}>
+            ${user.total_cost_usd.toFixed(4)}
+          </div>
+          <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Revenue</div>
+        </div>
+
+        <div className="w-[15%] flex flex-col items-center gap-1.5">
+          <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                usagePercent > 80 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+                usagePercent > 50 ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]' :
+                'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+              }`}
+              style={{ width: `${Math.min(usagePercent, 100)}%` }}
+            ></div>
+          </div>
+          <span className="data-mono text-[9px] text-white/30">{Math.round(usagePercent)}% load</span>
+        </div>
+
+        <div className="w-[10%] text-right flex items-center justify-end gap-3">
+          <div className="flex flex-col items-end">
+            <div className={`data-mono text-xs ${isOnline ? 'text-emerald-400' : 'text-white/40'}`}>{getTimeAgo()}</div>
+            <div className="data-mono text-[9px] text-white/20 uppercase tracking-wider mt-0.5">Last seen</div>
+          </div>
+          {isExpanded ? <ChevronUp size={16} className="text-white/40" /> : <ChevronDown size={16} className="text-white/40" />}
         </div>
       </div>
-
-      <div className="w-[15%] text-center">
-        <div className={`data-mono text-sm font-bold ${user.total_cost_usd > 1 ? 'text-[var(--accent)]' : user.total_cost_usd > 0 ? 'text-white/90' : 'text-white/30'}`}>
-          ${user.total_cost_usd.toFixed(4)}
+      
+      {/* Expandable Models Sub-panel */}
+      <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isExpanded ? 'max-h-[500px] opacity-100 mb-4' : 'max-h-0 opacity-0'}`}>
+        <div className="glass rounded-xl p-5 border border-white/5 bg-white/[0.02] ml-16 mr-4 relative">
+          <div className="absolute top-0 left-6 w-[1px] h-full bg-gradient-to-b from-white/10 to-transparent -ml-10"></div>
+          
+          <h4 className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40 mb-4 flex items-center gap-2">
+            <Cpu size={12} className="text-[var(--accent)]" />
+            Models Utilized
+          </h4>
+          
+          {user.models_used && user.models_used.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {user.models_used.map((item, idx) => (
+                <span key={item.model || idx} className="data-mono text-xs px-3 py-1.5 rounded-full border border-[var(--accent)]/20 text-[var(--accent)] bg-[var(--accent)]/5 hover:bg-[var(--accent)]/15 transition-colors cursor-default flex items-center gap-1.5">
+                  {item.model || 'Unknown'}
+                  <span className="bg-[var(--accent)]/20 text-[var(--accent)] px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    {item.count}
+                  </span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="data-mono text-xs text-white/30 italic">No models utilized yet.</div>
+          )}
         </div>
-        <div className="data-mono text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Revenue</div>
-      </div>
-
-      <div className="w-[15%] flex flex-col items-center gap-1.5">
-        <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
-          <div
-            className={`h-full rounded-full transition-all duration-1000 ${
-              usagePercent > 80 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
-              usagePercent > 50 ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]' :
-              'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-            }`}
-            style={{ width: `${Math.min(usagePercent, 100)}%` }}
-          ></div>
-        </div>
-        <span className="data-mono text-[9px] text-white/30">{Math.round(usagePercent)}% load</span>
-      </div>
-
-      <div className="w-[15%] text-right">
-        <div className={`data-mono text-xs ${isOnline ? 'text-emerald-400' : 'text-white/40'}`}>{getTimeAgo()}</div>
-        <div className="data-mono text-[9px] text-white/20 uppercase tracking-wider mt-0.5">Last seen</div>
       </div>
     </div>
   );

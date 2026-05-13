@@ -7,7 +7,7 @@
   "task_tiers": {
     "general":   ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
     "chat":      ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
-    "research":  ["groq", "gemini", "github", "nvidia", "nvidia_77", "huggingface"],
+    "research":  ["gemini", "github", "claude", "xai", "openrouter", "nvidia", "groq"],
     "chat_faq":  ["groq", "gemini", "cloudflare", "huggingface"],
     "summarize": ["groq", "cerebras", "gemini", "cloudflare"],
     "rewrite":   ["gemini", "groq", "cloudflare"],

@@ -173,12 +173,25 @@ async def list_users(
             func.coalesce(func.sum(RequestLog.tokens_in), 0).label("tokens_in"),
             func.coalesce(func.sum(RequestLog.tokens_out), 0).label("tokens_out"),
             func.coalesce(func.sum(RequestLog.cost_usd), 0.0).label("total_cost"),
-            func.max(RequestLog.created_at).label("last_active"),
+            func.max(RequestLog.created_at).label("last_active")
         )
         .outerjoin(RequestLog, RequestLog.user_id == User.id)
         .group_by(User.id, User.username, User.role, User.is_active, User.created_at)
         .order_by(desc(User.created_at))
     )
+    
+    # Fetch model usage counts per user
+    model_counts_result = await db.execute(
+        select(RequestLog.user_id, RequestLog.model, func.count(RequestLog.id))
+        .where(RequestLog.model.is_not(None))
+        .group_by(RequestLog.user_id, RequestLog.model)
+    )
+    
+    model_counts_map = {}
+    for u_id, model, count in model_counts_result.all():
+        if u_id not in model_counts_map:
+            model_counts_map[u_id] = []
+        model_counts_map[u_id].append({"model": model, "count": count})
     
     users = []
     for row in result.all():
@@ -193,6 +206,7 @@ async def list_users(
             "tokens_in": int(row.tokens_in),
             "tokens_out": int(row.tokens_out),
             "total_cost_usd": round(float(row.total_cost), 6),
+            "models_used": model_counts_map.get(row.id, [])
         })
     
     return {"users": users}
