@@ -1,4 +1,4 @@
-# Aether Protocol — Multi AI Agents Gateway
+# Multi AI Agents Gateway
 
 A self-hosted, zero-cost AI gateway that unifies 10+ free-tier LLM providers behind a single OpenAI-compatible endpoint. One endpoint, automatic provider selection, intelligent task routing, and real-time cost tracking — designed to reduce AI infrastructure costs by 90-95%.
 
