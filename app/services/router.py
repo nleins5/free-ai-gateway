@@ -113,6 +113,64 @@ class RouterService:
             # Default sequence
             return available
 
+    # Per-task model overrides — use the STRONGEST models for tasks that need intelligence
+    TASK_MODEL_OVERRIDES = {
+        "research": {
+            "github": "gpt-4o",
+            "gemini": "gemini-2.0-flash",
+            "chutes": "deepseek-ai/DeepSeek-V3-0324",
+            "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "groq": "llama-3.3-70b-versatile",
+        },
+        "code": {
+            "github": "gpt-4o",
+            "chutes": "deepseek-ai/DeepSeek-V3-0324",
+            "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "groq": "llama-3.3-70b-versatile",
+        },
+        "reasoning": {
+            "github": "gpt-4o",
+            "gemini": "gemini-2.0-flash-thinking-exp",
+            "chutes": "deepseek-ai/DeepSeek-R1",
+            "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "groq": "llama-3.3-70b-versatile",
+        },
+    }
+
+    TASK_SYSTEM_PROMPTS = {
+        "research": (
+            "You are an elite research analyst. When answering:\n"
+            "1. Break down the question into sub-questions\n"
+            "2. Provide comprehensive, structured analysis with clear sections\n"
+            "3. Include specific data points, dates, and facts when possible\n"
+            "4. Compare multiple perspectives or approaches\n"
+            "5. End with a concise summary and actionable recommendations\n"
+            "Always aim for depth and accuracy over brevity."
+        ),
+        "code": (
+            "You are a senior software engineer. When writing code:\n"
+            "1. Write clean, production-ready code with proper error handling\n"
+            "2. Include type hints and brief inline comments for complex logic\n"
+            "3. Follow the language's best practices and conventions\n"
+            "4. If debugging, explain the root cause before the fix\n"
+            "Always provide complete, runnable code — never use placeholders."
+        ),
+        "omniverse": (
+            "You are an expert NVIDIA Omniverse and OpenUSD developer. "
+            "Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, "
+            "and assist with 3D scene creation using Omniverse Kit. "
+            "Always provide clean, functional Python code when requested."
+        ),
+        "reasoning": (
+            "You are a deep reasoning engine. Think step-by-step through every problem.\n"
+            "1. State your assumptions explicitly\n"
+            "2. Show your chain of thought with numbered steps\n"
+            "3. Consider edge cases and counterarguments\n"
+            "4. Arrive at a well-justified conclusion\n"
+            "Take your time — accuracy matters more than speed."
+        ),
+    }
+
     async def chat_with_failover(
         self,
         messages: List[Dict[str, Any]],
@@ -123,13 +181,12 @@ class RouterService:
         task: Optional[str] = "general",
     ) -> Tuple[Any, Dict[str, Any]]:
         
-        if task == "omniverse":
-            sys_msg = {
-                "role": "system",
-                "content": "You are an expert NVIDIA Omniverse and OpenUSD developer. Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, and assist with 3D scene creation using Omniverse Kit. Always provide clean, functional Python code when requested."
-            }
+        # Inject task-specific system prompts
+        task_prompt = self.TASK_SYSTEM_PROMPTS.get(task)
+        if task_prompt:
+            sys_msg = {"role": "system", "content": task_prompt}
             if messages and messages[0].get("role") == "system":
-                messages[0]["content"] += "\n" + sys_msg["content"]
+                messages[0]["content"] += "\n" + task_prompt
             else:
                 messages.insert(0, sys_msg)
 
@@ -171,7 +228,12 @@ class RouterService:
         errors = []
         for provider in providers:
             client = self.get_client(provider)
-            model = self._get_provider_model(provider, model_override)
+            # Use task-specific model override if user didn't specify one
+            effective_override = model_override
+            if not effective_override:
+                task_overrides = self.TASK_MODEL_OVERRIDES.get(resolved_task, {})
+                effective_override = task_overrides.get(provider.key)
+            model = self._get_provider_model(provider, effective_override)
             
             payload = {
                 "model": model,
