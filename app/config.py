@@ -44,20 +44,23 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
     "nvidia_33": (0.0, 0.0),
     "nvidia_77": (0.0, 0.0),
     "nvidia_custom": (0.0, 0.0),
+    "chutes": (0.0, 0.0),
+    "novita": (0.0, 0.0),
+    "deepinfra": (0.0, 0.0),
 }
 
 # --- DYNAMIC STATE ---
 # These are loaded from providers.json and updated via reload_config()
-_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github,cerebras,huggingface,sambanova,groq,gemini,cloudflare,openrouter,freetheai").split(",") if s.strip()]
+_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github,cerebras,huggingface,sambanova,groq,gemini,cloudflare,openrouter,chutes,novita,deepinfra,freetheai").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
-    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77"],
-    "research": ["github", "gemini", "claude", "xai", "nvidia"],
-    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77"],
-    "vision": ["github", "gemini"],
+    "general": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77"],
+    "chat": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77"],
+    "research": ["github", "gemini", "deepinfra", "chutes", "claude", "xai", "nvidia", "novita", "groq"],
+    "code": ["github", "deepinfra", "chutes", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "novita"],
+    "vision": ["github", "gemini", "deepinfra"],
     "image": ["cloudflare", "huggingface", "freetheai"],
-    "gemma": ["groq", "openrouter", "huggingface"],
-    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq"]
+    "gemma": ["groq", "openrouter", "huggingface", "deepinfra", "novita"],
+    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"]
 }
 
 class Settings:

@@ -148,4 +148,28 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         model_env="NVIDIA_MODEL_CUSTOM",
         default_model="nvidia/llama-3.1-nemotron-70b-instruct",
     ),
+    "chutes": Provider(
+        key="chutes",
+        name="Chutes AI",
+        base_url="https://llm.chutes.ai/v1",
+        api_key_env="CHUTES_API_KEY",
+        model_env="CHUTES_MODEL",
+        default_model="deepseek-ai/DeepSeek-V3-0324",
+    ),
+    "novita": Provider(
+        key="novita",
+        name="Novita AI",
+        base_url="https://api.novita.ai/v3/openai",
+        api_key_env="NOVITA_API_KEY",
+        model_env="NOVITA_MODEL",
+        default_model="meta-llama/llama-3.1-70b-instruct",
+    ),
+    "deepinfra": Provider(
+        key="deepinfra",
+        name="DeepInfra",
+        base_url="https://api.deepinfra.com/v1/openai",
+        api_key_env="DEEPINFRA_API_KEY",
+        model_env="DEEPINFRA_MODEL",
+        default_model="meta-llama/Llama-3.3-70B-Instruct",
+    ),
 }
