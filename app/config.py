@@ -9,7 +9,7 @@ load_dotenv()
 # --- CONSTANTS ---
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "changeme")
 PROVIDERS_JSON_PATH = os.getenv("PROVIDERS_JSON_PATH", "providers.json")
-REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "15"))
+REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "8"))
 IMAGE_MAX_WAIT_MS = max(int(os.getenv("IMAGE_MAX_WAIT_MS", "9500")), 1000)
 MAX_RETRIES_PER_PROVIDER = max(int(os.getenv("MAX_RETRIES_PER_PROVIDER", "1")), 0)
 PROVIDER_FAILURE_THRESHOLD = max(int(os.getenv("PROVIDER_FAILURE_THRESHOLD", "2")), 1)

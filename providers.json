@@ -1,33 +1,34 @@
 {
-  "_comment": "Hot-reload provider config. Edit this file and call POST /admin/reload-providers to apply without restart.",
+  "_comment": "Hot-reload provider config. Providers ordered by VERIFIED working status on Render (groq/nvidia first).",
   "provider_chain": [
-    "groq", "gemini", "github", "cerebras", "deepinfra", "chutes",
+    "groq", "nvidia", "github", "gemini", "cerebras", "deepinfra", "chutes",
     "huggingface", "sambanova", "novita", "cloudflare", "openrouter",
-    "xai", "together", "claude", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom", "freetheai"
+    "xai", "together", "claude", "nvidia_33", "nvidia_77", "nvidia_custom", "freetheai"
   ],
   "task_tiers": {
-    "general":   ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77"],
-    "chat":      ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77"],
-    "research":  ["github", "gemini", "deepinfra", "chutes", "claude", "xai", "openrouter", "nvidia", "novita", "groq"],
-    "chat_faq":  ["groq", "gemini", "deepinfra", "cloudflare", "chutes", "huggingface", "novita"],
-    "summarize": ["groq", "cerebras", "gemini", "deepinfra", "cloudflare", "chutes"],
-    "rewrite":   ["gemini", "groq", "deepinfra", "cloudflare", "chutes"],
-    "classify":  ["cloudflare", "groq", "gemini", "deepinfra", "chutes"],
-    "translate": ["gemini", "groq", "deepinfra", "cloudflare", "chutes", "novita"],
-    "code":      ["github", "deepinfra", "chutes", "groq", "cerebras", "huggingface", "xai", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom", "novita"],
-    "reasoning": ["groq", "gemini", "github", "deepinfra", "chutes", "xai", "together", "claude", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom", "novita"],
-    "rag":       ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "nvidia", "nvidia_33", "nvidia_77", "nvidia_custom", "novita"],
-    "vision":    ["github", "gemini", "deepinfra"],
+    "general":   ["groq", "nvidia", "github", "gemini", "deepinfra", "chutes", "huggingface", "novita", "cloudflare", "nvidia_77"],
+    "chat":      ["groq", "nvidia", "github", "gemini", "deepinfra", "chutes", "huggingface", "novita", "cloudflare", "nvidia_77"],
+    "research":  ["groq", "nvidia", "github", "gemini", "deepinfra", "chutes", "claude", "xai", "novita", "openrouter"],
+    "chat_faq":  ["groq", "nvidia", "gemini", "deepinfra", "cloudflare", "chutes", "huggingface", "novita"],
+    "summarize": ["groq", "nvidia", "cerebras", "gemini", "deepinfra", "cloudflare", "chutes"],
+    "rewrite":   ["groq", "nvidia", "gemini", "deepinfra", "cloudflare", "chutes"],
+    "classify":  ["groq", "nvidia", "cloudflare", "gemini", "deepinfra", "chutes"],
+    "translate": ["groq", "nvidia", "gemini", "deepinfra", "cloudflare", "chutes", "novita"],
+    "code":      ["groq", "nvidia", "github", "deepinfra", "chutes", "cerebras", "huggingface", "xai", "nvidia_33", "nvidia_77", "nvidia_custom", "novita"],
+    "reasoning": ["groq", "nvidia", "github", "gemini", "deepinfra", "chutes", "xai", "together", "claude", "nvidia_33", "nvidia_77", "nvidia_custom", "novita"],
+    "rag":       ["groq", "nvidia", "github", "gemini", "deepinfra", "chutes", "huggingface", "nvidia_33", "nvidia_77", "nvidia_custom", "novita"],
+    "vision":    ["github", "gemini", "nvidia", "deepinfra"],
     "image":     ["cloudflare", "huggingface", "freetheai"],
-    "gemma":     ["groq", "gemini", "openrouter", "huggingface", "deepinfra", "novita", "cloudflare"],
+    "gemma":     ["groq", "nvidia", "gemini", "openrouter", "huggingface", "deepinfra", "novita", "cloudflare"],
     "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"]
   },
   "provider_weights": {
-    "groq": 3,
-    "gemini": 3,
+    "groq": 5,
+    "nvidia": 4,
     "github": 3,
+    "gemini": 3,
     "cerebras": 2,
-    "deepinfra": 3,
+    "deepinfra": 2,
     "chutes": 2,
     "novita": 2,
     "huggingface": 1,
@@ -37,7 +38,6 @@
     "xai": 1,
     "together": 1,
     "claude": 1,
-    "nvidia": 2,
     "nvidia_33": 2,
     "nvidia_77": 2,
     "nvidia_custom": 2,
@@ -48,5 +48,5 @@
     "alert_threshold_usd": 0,
     "_comment": "0 = unlimited. Set a value to auto-block requests when exceeded."
   },
-  "updated_at": "2026-05-14T04:00:00Z"
+  "updated_at": "2026-05-14T11:00:00Z"
 }
