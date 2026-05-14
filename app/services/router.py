@@ -116,24 +116,24 @@ class RouterService:
     # Per-task model overrides — use the STRONGEST models for tasks that need intelligence
     TASK_MODEL_OVERRIDES = {
         "research": {
-            "github": "gpt-4o",
+            "github": "gpt-4o-mini",
             "gemini": "gemini-2.0-flash",
-            "chutes": "deepseek-ai/DeepSeek-V3-0324",
             "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
             "groq": "llama-3.3-70b-versatile",
+            "nvidia": "meta/llama-3.1-70b-instruct",
         },
         "code": {
-            "github": "gpt-4o",
-            "chutes": "deepseek-ai/DeepSeek-V3-0324",
+            "github": "gpt-4o-mini",
             "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
             "groq": "llama-3.3-70b-versatile",
+            "nvidia": "meta/llama-3.1-70b-instruct",
         },
         "reasoning": {
-            "github": "gpt-4o",
-            "gemini": "gemini-2.0-flash-thinking-exp",
-            "chutes": "deepseek-ai/DeepSeek-R1",
+            "github": "gpt-4o-mini",
+            "gemini": "gemini-2.0-flash",
             "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
             "groq": "llama-3.3-70b-versatile",
+            "nvidia": "meta/llama-3.1-70b-instruct",
         },
     }
 
