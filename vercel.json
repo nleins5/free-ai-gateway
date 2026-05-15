@@ -1,0 +1,14 @@
+{
+  "buildCommand": "cd ui && npm install && npm run build",
+  "outputDirectory": "ui/dist",
+  "redirects": [
+    {
+      "source": "/docs",
+      "destination": "https://free-ai-gateway.onrender.com/docs",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
