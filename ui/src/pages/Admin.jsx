@@ -900,7 +900,7 @@ const Admin = () => {
           )}
 
           {/* Add Provider Form */}
-          <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${showAddProvider ? 'max-h-[800px] opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
+          <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${showAddProvider ? 'max-h-[1500px] opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
             <div className="glass rounded-premium p-8 md:p-10 border border-[var(--accent)]/20">
               <div className="flex items-center gap-3 mb-8">
                 <Settings className="w-6 h-6 text-[var(--accent)]" />
