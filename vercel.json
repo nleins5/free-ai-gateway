@@ -9,6 +9,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/v1/(.*)", "destination": "https://free-ai-gateway.onrender.com/v1/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
