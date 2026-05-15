@@ -53,14 +53,15 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
 # These are loaded from providers.json and updated via reload_config()
 _DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github,cerebras,huggingface,sambanova,groq,gemini,cloudflare,openrouter,chutes,novita,deepinfra,freetheai").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77"],
-    "chat": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77"],
-    "research": ["github", "gemini", "deepinfra", "chutes", "claude", "xai", "nvidia", "novita", "groq"],
-    "code": ["github", "deepinfra", "chutes", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "novita"],
-    "vision": ["github", "gemini", "deepinfra"],
+    "general": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77", "nvidia_custom", "cerebras", "sambanova", "openrouter", "together", "xai"],
+    "chat": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77", "nvidia_custom", "cerebras", "sambanova", "openrouter", "together", "xai"],
+    "research": ["github", "gemini", "deepinfra", "chutes", "claude", "xai", "nvidia", "nvidia_77", "nvidia_custom", "novita", "groq", "huggingface", "cerebras", "sambanova", "openrouter", "together"],
+    "code": ["github", "deepinfra", "chutes", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "nvidia_custom", "novita", "gemini", "sambanova", "openrouter", "together", "xai"],
+    "vision": ["github", "gemini", "deepinfra", "nvidia", "nvidia_77", "groq"],
     "image": ["cloudflare", "huggingface", "freetheai"],
-    "gemma": ["groq", "openrouter", "huggingface", "deepinfra", "novita"],
-    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"]
+    "gemma": ["groq", "openrouter", "huggingface", "deepinfra", "novita", "cerebras", "sambanova", "together"],
+    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra", "gemini", "github", "chutes", "novita", "huggingface", "cerebras", "openrouter", "together", "xai"],
+    "reasoning": ["groq", "deepinfra", "chutes", "nvidia", "nvidia_77", "nvidia_custom", "gemini", "github", "novita", "huggingface", "cerebras", "sambanova", "openrouter", "together", "xai"],
 }
 
 class Settings:
