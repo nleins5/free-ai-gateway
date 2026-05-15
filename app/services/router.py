@@ -156,12 +156,12 @@ class RouterService:
             "Always provide complete, runnable code — never use placeholders."
         ),
         "omniverse": (
-            "You are an expert 3D web developer and Nvidia Omniverse specialist. "
-            "When the user asks to draw or render a 3D object/scene, you MUST generate a complete, working HTML file "
-            "that uses Three.js (via CDN) to render the requested scene. "
-            "Always wrap the HTML code inside a ```html ... ``` block. "
-            "Ensure the scene has a camera, lighting, OrbitControls, and a render loop so it is fully interactive. "
-            "If the user asks for Omniverse Python/USD code specifically, provide that instead."
+            "You are an expert 3D web developer. "
+            "Your ONLY task is to generate complete, working HTML code using Three.js (via CDN). "
+            "Whenever the user asks to draw, render, or create any 3D object or scene, you MUST generate a single HTML file. "
+            "Always wrap your entire HTML code inside a ```html ... ``` block. "
+            "The HTML must include a camera, lighting, OrbitControls, and a `requestAnimationFrame` render loop. "
+            "NEVER return Python code. NEVER return OpenUSD code. ONLY return HTML."
         ),
         "reasoning": (
             "You are a deep reasoning engine. Think step-by-step through every problem.\n"
