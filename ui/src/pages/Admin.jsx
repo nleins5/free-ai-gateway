@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import gsap from 'gsap';
-import { Activity, Zap, DollarSign, Server, RefreshCw, Terminal, Shield, Cpu, ArrowLeft, Users, TrendingUp, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity, Zap, DollarSign, Server, RefreshCw, Terminal, Shield, Cpu, ArrowLeft, Users, TrendingUp, Eye, ChevronDown, ChevronUp, Plus, Trash2, Settings, Check, X, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -247,6 +247,14 @@ const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
 
+  // Provider Manager state
+  const [showAddProvider, setShowAddProvider] = useState(false);
+  const [providerForm, setProviderForm] = useState({
+    key: '', name: '', base_url: '', api_key: '', default_model: '', weight: 2, tasks: []
+  });
+  const [providerMsg, setProviderMsg] = useState({ type: '', text: '' });
+  const [removingProvider, setRemovingProvider] = useState(null);
+
   const containerRef = useRef(null);
   const loginRef = useRef(null);
 
@@ -353,6 +361,56 @@ const Admin = () => {
       );
     }
   }, [isAuthenticated]);
+
+  const addProvider = async () => {
+    const { key, name, base_url, api_key, default_model, weight, tasks } = providerForm;
+    if (!key || !name || !base_url || !api_key || !default_model) {
+      setProviderMsg({ type: 'error', text: 'All fields are required.' });
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/v1/admin/providers/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': secret },
+        body: JSON.stringify({ key, name, base_url, api_key, default_model, weight: Number(weight), tasks }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setProviderMsg({ type: 'success', text: data.message });
+        setProviderForm({ key: '', name: '', base_url: '', api_key: '', default_model: '', weight: 2, tasks: [] });
+        setShowAddProvider(false);
+        void fetchTelemetry(secret);
+        setTimeout(() => setProviderMsg({ type: '', text: '' }), 4000);
+      } else {
+        setProviderMsg({ type: 'error', text: data.message });
+      }
+    } catch (e) {
+      setProviderMsg({ type: 'error', text: 'Failed to reach backend.' });
+    }
+  };
+
+  const removeProvider = async (providerKey) => {
+    if (!confirm(`Remove provider "${providerKey}" from the routing chain?`)) return;
+    setRemovingProvider(providerKey);
+    try {
+      const res = await fetch(`${API_BASE}/v1/admin/providers/${providerKey}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Key': secret },
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setProviderMsg({ type: 'success', text: data.message });
+        void fetchTelemetry(secret);
+        setTimeout(() => setProviderMsg({ type: '', text: '' }), 4000);
+      } else {
+        setProviderMsg({ type: 'error', text: data.message });
+      }
+    } catch (e) {
+      setProviderMsg({ type: 'error', text: 'Failed to reach backend.' });
+    } finally {
+      setRemovingProvider(null);
+    }
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -808,8 +866,144 @@ const Admin = () => {
           </div>
           <div className="glass rounded-premium p-8 md:p-10">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(stats?.failover_breakdown || {}).map(([provider, data]) => { const total = data.success + data.error; const sr = total > 0 ? (data.success / total) * 100 : 0; return (<div key={provider} className="bg-white/5 rounded-3xl p-6 border border-white/5 hover:border-[var(--accent)]/20 transition-all"><div className="flex justify-between items-center mb-4"><span className="font-bold text-white tracking-tight">{provider}</span><span className={`data-mono text-xs font-bold ${sr > 90 ? 'text-emerald-400' : sr > 60 ? 'text-yellow-400' : 'text-red-400'}`}>{sr.toFixed(1)}%</span></div><div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5 mb-3"><div className={`h-full rounded-full ${sr > 90 ? 'bg-emerald-500' : sr > 60 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{width: `${sr}%`}}></div></div><div className="flex justify-between data-mono text-[9px] text-white/30"><span className="text-emerald-400/60">✓ {data.success}</span><span className="text-red-400/60">✗ {data.error}</span></div></div>); })}
+              {Object.entries(stats?.failover_breakdown || {}).map(([provider, data]) => { const total = data.success + data.error; const sr = total > 0 ? (data.success / total) * 100 : 0; const isCore = ['groq','nvidia','github','gemini'].includes(provider); return (<div key={provider} className="bg-white/5 rounded-3xl p-6 border border-white/5 hover:border-[var(--accent)]/20 transition-all relative group"><div className="flex justify-between items-center mb-4"><span className="font-bold text-white tracking-tight">{provider}</span><div className="flex items-center gap-2"><span className={`data-mono text-xs font-bold ${sr > 90 ? 'text-emerald-400' : sr > 60 ? 'text-yellow-400' : 'text-red-400'}`}>{sr.toFixed(1)}%</span>{!isCore && <button onClick={() => removeProvider(provider)} disabled={removingProvider === provider} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-red-500/20 text-red-400/60 hover:text-red-400"><Trash2 size={12} /></button>}</div></div><div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5 mb-3"><div className={`h-full rounded-full ${sr > 90 ? 'bg-emerald-500' : sr > 60 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{width: `${sr}%`}}></div></div><div className="flex justify-between data-mono text-[9px] text-white/30"><span className="text-emerald-400/60">✓ {data.success}</span><span className="text-red-400/60">✗ {data.error}</span></div>{isCore && <div className="absolute top-3 right-3"><span className="data-mono text-[7px] uppercase tracking-widest px-1.5 py-0.5 rounded border border-[var(--accent)]/20 text-[var(--accent)]/40 bg-[var(--accent)]/5">Core</span></div>}</div>); })}
               {Object.keys(stats?.failover_breakdown || {}).length === 0 && (<div className="col-span-full text-center py-16 text-white/20 data-mono text-xs">No failover data recorded yet</div>)}
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════ PROVIDER MANAGER ═══════ */}
+        <div className="admin-reveal mt-12">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+            <div>
+              <h2 className="text-4xl md:text-5xl tracking-tighter mb-2">
+                Provider <span className="font-drama text-[var(--accent)]">Manager.</span>
+              </h2>
+              <p className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/40">
+                Add or remove AI providers from the routing chain at runtime
+              </p>
+            </div>
+            <button
+              onClick={() => { setShowAddProvider(!showAddProvider); setProviderMsg({ type: '', text: '' }); }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all duration-300 ${showAddProvider ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' : 'bg-[var(--accent)] text-[var(--primary)] hover:scale-[1.03]'}`}
+            >
+              {showAddProvider ? <><X size={16} /> Cancel</> : <><Plus size={16} /> Add Provider</>}
+            </button>
+          </div>
+
+          {/* Feedback Toast */}
+          {providerMsg.text && (
+            <div className={`mb-6 flex items-center gap-3 px-6 py-4 rounded-2xl border data-mono text-xs transition-all duration-500 ${providerMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+              {providerMsg.type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}
+              {providerMsg.text}
+            </div>
+          )}
+
+          {/* Add Provider Form */}
+          <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${showAddProvider ? 'max-h-[800px] opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
+            <div className="glass rounded-premium p-8 md:p-10 border border-[var(--accent)]/20">
+              <div className="flex items-center gap-3 mb-8">
+                <Settings className="w-6 h-6 text-[var(--accent)]" />
+                <h3 className="text-2xl tracking-tight">Register New Provider</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-2">
+                  <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2">Provider Key (slug)</label>
+                  <input type="text" placeholder="e.g. mistral" value={providerForm.key} onChange={e => setProviderForm({...providerForm, key: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent)] transition-all text-white data-mono placeholder:text-white/20" />
+                </div>
+                <div className="space-y-2">
+                  <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2">Display Name</label>
+                  <input type="text" placeholder="e.g. Mistral AI" value={providerForm.name} onChange={e => setProviderForm({...providerForm, name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent)] transition-all text-white data-mono placeholder:text-white/20" />
+                </div>
+                <div className="space-y-2">
+                  <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2">Base URL</label>
+                  <input type="text" placeholder="e.g. https://api.mistral.ai/v1" value={providerForm.base_url} onChange={e => setProviderForm({...providerForm, base_url: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent)] transition-all text-white data-mono placeholder:text-white/20" />
+                </div>
+                <div className="space-y-2">
+                  <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2">API Key</label>
+                  <input type="password" placeholder="sk-..." value={providerForm.api_key} onChange={e => setProviderForm({...providerForm, api_key: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent)] transition-all text-white data-mono placeholder:text-white/20" />
+                </div>
+                <div className="space-y-2">
+                  <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2">Default Model</label>
+                  <input type="text" placeholder="e.g. mistral-large-latest" value={providerForm.default_model} onChange={e => setProviderForm({...providerForm, default_model: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent)] transition-all text-white data-mono placeholder:text-white/20" />
+                </div>
+                <div className="space-y-2">
+                  <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2">Routing Weight (1-10)</label>
+                  <input type="number" min={1} max={10} value={providerForm.weight} onChange={e => setProviderForm({...providerForm, weight: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent)] transition-all text-white data-mono placeholder:text-white/20" />
+                </div>
+              </div>
+
+              {/* Task Tier Checkboxes */}
+              <div className="mb-8">
+                <label className="data-mono text-[10px] uppercase tracking-widest text-[var(--bg-light)]/60 ml-2 block mb-3">Assign to Task Tiers</label>
+                <div className="flex flex-wrap gap-2">
+                  {['general', 'chat', 'research', 'code', 'reasoning', 'translate', 'summarize', 'rewrite'].map(task => {
+                    const isSelected = providerForm.tasks.includes(task);
+                    return (
+                      <button
+                        key={task}
+                        onClick={() => {
+                          setProviderForm(prev => ({
+                            ...prev,
+                            tasks: isSelected ? prev.tasks.filter(t => t !== task) : [...prev.tasks, task]
+                          }));
+                        }}
+                        className={`data-mono text-[10px] uppercase tracking-widest px-4 py-2 rounded-full border transition-all ${isSelected ? 'border-[var(--accent)]/50 text-[var(--accent)] bg-[var(--accent)]/10' : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'}`}
+                      >
+                        {isSelected && <Check size={10} className="inline mr-1 -mt-0.5" />}
+                        {task}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Submit */}
+              <div className="flex justify-end">
+                <button
+                  onClick={addProvider}
+                  className="bg-[var(--accent)] text-[var(--primary)] font-bold px-10 py-4 rounded-full hover:scale-[1.03] transition-transform flex items-center gap-2"
+                >
+                  <Plus size={18} />
+                  Register Provider
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Current Provider Chain */}
+          <div className="glass rounded-premium p-8 md:p-10">
+            <div className="flex items-center gap-3 mb-8">
+              <Server className="w-6 h-6 text-[var(--accent)]" />
+              <h3 className="text-2xl tracking-tight">Active Routing Chain</h3>
+              <span className="data-mono text-[10px] text-white/30 ml-auto">{providersData.length} providers registered</span>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {(stats ? Object.keys(stats.providers || {}) : []).concat(
+                providersData.map(p => p.name.toLowerCase().replace(/\s+/g, '_'))
+              ).filter((v, i, a) => a.indexOf(v) === i).length === 0 ? (
+                <div className="text-center py-12 text-white/20 data-mono text-xs w-full">No providers in chain</div>
+              ) : providersData.map((p, i) => {
+                const isCore = ['Groq', 'Nvidia', 'Github', 'Gemini', 'NVIDIA NIM', 'GitHub Models', 'Google Gemini'].some(c => p.name.toLowerCase().includes(c.toLowerCase()));
+                return (
+                  <div key={i} className="relative group flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[var(--accent)]/30 rounded-2xl px-4 py-3 transition-all">
+                    <div className={`w-2 h-2 rounded-full ${p.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                    <span className="font-bold text-white text-sm">{p.name}</span>
+                    <span className="data-mono text-[9px] text-white/30">{p.latency}ms</span>
+                    {!isCore && (
+                      <button
+                        onClick={() => removeProvider(p.name.toLowerCase().replace(/[\s()]/g, '_'))}
+                        disabled={removingProvider !== null}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-1 rounded-full hover:bg-red-500/20 text-red-400/50 hover:text-red-400"
+                        title="Remove from chain"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

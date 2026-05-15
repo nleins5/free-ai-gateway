@@ -249,6 +249,157 @@ async def reload_providers_config():
     }
 
 
+@router.post("/providers/add", dependencies=[Depends(verify_admin)])
+async def add_provider(request: Request):
+    """Dynamically register a new AI provider at runtime.
+
+    Accepts JSON body with fields:
+      - key (str, required): unique slug, e.g. "mistral"
+      - name (str, required): display name, e.g. "Mistral AI"
+      - base_url (str, required): API endpoint URL
+      - api_key (str, required): the API secret key
+      - default_model (str, required): model identifier, e.g. "mistral-large-latest"
+      - weight (int, optional): routing weight 1-10, default 2
+      - tasks (list[str], optional): task tiers to join, e.g. ["general","code"]
+    """
+    import json as _json
+    from app.core.providers import PROVIDER_REGISTRY, Provider
+    from app.config import PROVIDERS_JSON_PATH
+
+    body = await request.json()
+    key = (body.get("key") or "").strip().lower()
+    name = (body.get("name") or "").strip()
+    base_url = (body.get("base_url") or "").strip()
+    api_key = (body.get("api_key") or "").strip()
+    default_model = (body.get("default_model") or "").strip()
+    weight = int(body.get("weight", 2))
+    tasks = body.get("tasks", [])
+
+    if not all([key, name, base_url, api_key, default_model]):
+        return {"status": "error", "message": "Missing required fields: key, name, base_url, api_key, default_model"}
+
+    if key in PROVIDER_REGISTRY:
+        return {"status": "error", "message": f"Provider '{key}' already exists. Remove it first to re-add."}
+
+    # 1. Register in-memory provider
+    env_key = f"DYNAMIC_{key.upper()}_KEY"
+    env_model = f"DYNAMIC_{key.upper()}_MODEL"
+    import os
+    os.environ[env_key] = api_key
+    os.environ[env_model] = default_model
+
+    PROVIDER_REGISTRY[key] = Provider(
+        key=key,
+        name=name,
+        base_url=base_url,
+        api_key_env=env_key,
+        model_env=env_model,
+        default_model=default_model,
+    )
+
+    # 2. Update providers.json
+    try:
+        cfg = {}
+        if os.path.isfile(PROVIDERS_JSON_PATH):
+            with open(PROVIDERS_JSON_PATH, "r", encoding="utf-8") as f:
+                cfg = _json.load(f)
+
+        # Add to chain
+        chain = cfg.get("provider_chain", [])
+        if key not in chain:
+            chain.append(key)
+        cfg["provider_chain"] = chain
+
+        # Add to task_tiers
+        task_tiers = cfg.get("task_tiers", {})
+        for t in tasks:
+            t = t.strip().lower()
+            if t in task_tiers and key not in task_tiers[t]:
+                task_tiers[t].append(key)
+        cfg["task_tiers"] = task_tiers
+
+        # Add weight
+        weights = cfg.get("provider_weights", {})
+        weights[key] = max(1, min(weight, 10))
+        cfg["provider_weights"] = weights
+
+        with open(PROVIDERS_JSON_PATH, "w", encoding="utf-8") as f:
+            _json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return {"status": "warning", "message": f"Provider registered in-memory but providers.json update failed: {e}"}
+
+    # 3. Reload
+    await reload_config()
+
+    return {
+        "status": "success",
+        "message": f"Provider '{name}' ({key}) added successfully",
+        "provider": {
+            "key": key,
+            "name": name,
+            "base_url": base_url,
+            "default_model": default_model,
+            "weight": weight,
+            "tasks": tasks,
+        },
+        "active_chain": settings.provider_chain,
+    }
+
+
+@router.delete("/providers/{provider_key}", dependencies=[Depends(verify_admin)])
+async def remove_provider(provider_key: str):
+    """Remove a provider from the routing chain and registry."""
+    import json as _json
+    from app.core.providers import PROVIDER_REGISTRY
+    from app.config import PROVIDERS_JSON_PATH
+
+    key = provider_key.strip().lower()
+
+    # Protected providers that cannot be removed
+    protected = {"groq", "nvidia", "github", "gemini"}
+    if key in protected:
+        return {"status": "error", "message": f"Provider '{key}' is a core provider and cannot be removed."}
+
+    # Remove from in-memory registry
+    removed = PROVIDER_REGISTRY.pop(key, None)
+
+    # Remove from providers.json
+    try:
+        import os
+        cfg = {}
+        if os.path.isfile(PROVIDERS_JSON_PATH):
+            with open(PROVIDERS_JSON_PATH, "r", encoding="utf-8") as f:
+                cfg = _json.load(f)
+
+        # Remove from chain
+        chain = cfg.get("provider_chain", [])
+        cfg["provider_chain"] = [p for p in chain if p != key]
+
+        # Remove from all task tiers
+        task_tiers = cfg.get("task_tiers", {})
+        for tier_key in task_tiers:
+            task_tiers[tier_key] = [p for p in task_tiers[tier_key] if p != key]
+        cfg["task_tiers"] = task_tiers
+
+        # Remove from weights
+        weights = cfg.get("provider_weights", {})
+        weights.pop(key, None)
+        cfg["provider_weights"] = weights
+
+        with open(PROVIDERS_JSON_PATH, "w", encoding="utf-8") as f:
+            _json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return {"status": "warning", "message": f"Partial removal — providers.json update failed: {e}"}
+
+    await reload_config()
+
+    return {
+        "status": "success",
+        "message": f"Provider '{key}' removed successfully" if removed else f"Provider '{key}' was not in registry but cleaned from config.",
+        "active_chain": settings.provider_chain,
+    }
+
+
 @router.get("/config", dependencies=[Depends(verify_admin)])
 async def get_current_config():
     """View current active configuration (sensitive)."""
