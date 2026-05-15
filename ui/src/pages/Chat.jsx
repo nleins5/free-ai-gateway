@@ -7,12 +7,23 @@ const API_BASE = import.meta.env.VITE_API_BASE || '';
 const ChatMessage = ({ msg }) => {
     const isAi = msg.role === 'assistant';
     
+    let htmlContent = null;
+    let cleanContent = msg.content;
+    
+    if (isAi && msg.content && typeof msg.content === 'string') {
+        const htmlMatch = msg.content.match(/```html\n([\s\S]*?)```/);
+        if (htmlMatch) {
+            htmlContent = htmlMatch[1];
+            cleanContent = msg.content.replace(/```html\n[\s\S]*?```/, '').trim();
+        }
+    }
+    
     return (
         <div className={`flex gap-4 p-6 ${isAi ? 'bg-void' : ''}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isAi ? 'bg-plasma/20 text-plasma' : 'bg-graphite text-ghost/60'}`}>
                 {isAi ? <Sparkles className="w-5 h-5" /> : <div className="w-3 h-3 bg-ghost/40 rounded-full" />}
             </div>
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-4 overflow-hidden">
                 <div className="font-sans font-semibold text-ghost/80">
                     {isAi ? 'AI Gateway' : 'You'}
                 </div>
@@ -20,7 +31,17 @@ const ChatMessage = ({ msg }) => {
                     <img src={msg.content} alt="Generated" className="rounded-xl shadow-2xl max-w-full h-auto mt-2" />
                 ) : (
                     <div className="font-sans text-ghost/90 leading-relaxed whitespace-pre-wrap">
-                        {msg.content}
+                        {cleanContent}
+                        {htmlContent && (
+                            <div className="mt-4 rounded-xl overflow-hidden border border-graphite shadow-2xl bg-white w-full" style={{ height: '450px' }}>
+                                <iframe
+                                    srcDoc={htmlContent}
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                    sandbox="allow-scripts allow-same-origin"
+                                    title="3D Render"
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
                 {msg.latency && (
