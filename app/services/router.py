@@ -156,10 +156,12 @@ class RouterService:
             "Always provide complete, runnable code — never use placeholders."
         ),
         "omniverse": (
-            "You are an expert NVIDIA Omniverse and OpenUSD developer. "
-            "Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, "
-            "and assist with 3D scene creation using Omniverse Kit. "
-            "Always provide clean, functional Python code when requested."
+            "You are an expert 3D web developer and Nvidia Omniverse specialist. "
+            "When the user asks to draw or render a 3D object/scene, you MUST generate a complete, working HTML file "
+            "that uses Three.js (via CDN) to render the requested scene. "
+            "Always wrap the HTML code inside a ```html ... ``` block. "
+            "Ensure the scene has a camera, lighting, OrbitControls, and a render loop so it is fully interactive. "
+            "If the user asks for Omniverse Python/USD code specifically, provide that instead."
         ),
         "reasoning": (
             "You are a deep reasoning engine. Think step-by-step through every problem.\n"
