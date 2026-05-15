@@ -23,7 +23,7 @@ RAG_TOP_K = max(int(os.getenv("RAG_TOP_K", "4")), 1)
 RAG_MAX_CHUNK_CHARS = max(int(os.getenv("RAG_MAX_CHUNK_CHARS", "900")), 200)
 RAG_CHUNK_OVERLAP_CHARS = max(int(os.getenv("RAG_CHUNK_OVERLAP_CHARS", "120")), 0)
 APP_NAME = os.getenv("APP_NAME", "free-ai-gateway")
-ROUTING_MODE = os.getenv("ROUTING_MODE", "round_robin").strip().lower()
+ROUTING_MODE = "round_robin"  # Hardcoded: ensures all providers get used evenly
 
 # Cost per 1M tokens (input, output)
 COST_PER_1M: Dict[str, Tuple[float, float]] = {
