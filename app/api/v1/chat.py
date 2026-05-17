@@ -9,6 +9,7 @@ from app.services.router import RouterService
 from app.services.rag import RAGService
 from app.database import get_db
 from app.db_models import RequestLog, ChatMessage, Conversation, User
+from app.core.prompts import get_task_system_prompt
 from sqlalchemy import select
 
 router = APIRouter()
@@ -102,15 +103,20 @@ async def unified_chat(
         result = await db.execute(select(User).where(User.id == req.user_id))
         user = result.scalar_one_or_none()
         if not user:
-            user = User(
-                id=req.user_id,
-                username=f"guest_{req.user_id[:8]}",
-                api_key=f"sk_guest_{req.user_id}",
-                role="guest"
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
+            try:
+                user = User(
+                    id=req.user_id,
+                    username=f"guest_{req.user_id}",
+                    api_key=f"sk_guest_{req.user_id}",
+                    role="guest"
+                )
+                db.add(user)
+                await db.flush()
+            except Exception:
+                await db.rollback()
+                # Race condition: another request created this user already
+                result = await db.execute(select(User).where(User.id == req.user_id))
+                user = result.scalar_one_or_none()
     messages = []
     
     # 1. Handle Web Search (Research Mode) if requested
@@ -136,8 +142,15 @@ async def unified_chat(
         else:
             system_prompt = req.system_prompt or "You are a helpful assistant."
             messages.append({"role": "system", "content": system_prompt})
-    elif req.system_prompt:
-        messages.append({"role": "system", "content": req.system_prompt})
+    else:
+        system_prompt = req.system_prompt or get_task_system_prompt(req.task)
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+    # Append conversation history from request
+    if req.history:
+        for msg in req.history:
+            messages.append({"role": msg.role, "content": msg.content})
 
     messages.append({"role": "user", "content": req.query})
 

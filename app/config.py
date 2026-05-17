@@ -87,6 +87,8 @@ _DEFAULT_TASK_TIERS = {
     "image": ["cloudflare", "huggingface", "freetheai"],
     "gemma": ["groq", "openrouter", "huggingface"],
     "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"],
+    "interview": ["groq", "gemini", "github", "deepseek", "mistral", "deepinfra", "novita"],
+    "english": ["groq", "gemini", "github", "deepseek", "mistral", "deepinfra", "novita"],
     "fast": ["groq", "cerebras", "sambanova", "deepseek", "mistral", "novita"],
     "cheap": ["github", "freetheai", "cloudflare", "huggingface", "zhipu"],
     "smart": ["claude", "gemini", "deepseek-r1", "grok", "chutes"]

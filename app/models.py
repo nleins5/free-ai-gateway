@@ -59,3 +59,4 @@ class UnifiedAIChatRequest(BaseModel):
     system_prompt: Optional[str] = None
     use_rag: Optional[bool] = False
     user_id: Optional[str] = None
+    history: Optional[List[Message]] = []

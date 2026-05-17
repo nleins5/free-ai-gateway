@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
 from openai import AsyncOpenAI
 import os
 import tempfile
@@ -8,7 +8,10 @@ from app.config import settings
 router = APIRouter()
 
 @router.post("/transcriptions")
-async def create_transcription(file: UploadFile = File(...)):
+async def create_transcription(
+    file: UploadFile = File(...),
+    language: str = Form("vi"),
+):
     groq_api_key = settings.groq_api_key
     if not groq_api_key:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY not set in configuration")
@@ -28,19 +31,26 @@ async def create_transcription(file: UploadFile = File(...)):
             while chunk := await file.read(8192):
                 await temp_file.write(chunk)
 
+        normalized_language = "en" if language.lower().startswith("en") else "vi"
+        transcription_prompt = (
+            "This is an English learner speaking. Preserve filler words and possible recognition mistakes."
+            if normalized_language == "en"
+            else "Đây là câu nói tiếng Việt."
+        )
+
         with open(temp_path, "rb") as audio_file:
             transcription = await client.audio.transcriptions.create(
                 file=audio_file,
                 model="whisper-large-v3",
-                language="vi",
+                language=normalized_language,
                 temperature=0.0,
-                prompt="Đây là câu nói tiếng Việt.",
+                prompt=transcription_prompt,
                 response_format="json"
             )
 
         text = transcription.text.strip()
         # Lọc bỏ các kết quả bịa đặt thường gặp của Whisper
-        if not text or text in ["1", "1.", "Đây là câu nói tiếng Việt."]:
+        if not text or text in ["1", "1.", "Đây là câu nói tiếng Việt.", transcription_prompt]:
             return {"text": ""}
 
         return {"text": text}
