@@ -65,6 +65,13 @@ class StateStore:
             state["cooldown_until"] = time.time() + PROVIDER_COOLDOWN_S
             state["consecutive_failures"] = 0
 
+    def mark_cooldown(self, provider_key: str, cooldown_s: float = None) -> None:
+        """Manually put a provider on cooldown for a specified or default duration."""
+        state = self.ensure_provider_state(provider_key)
+        duration = cooldown_s if cooldown_s is not None else PROVIDER_COOLDOWN_S
+        state["cooldown_until"] = time.time() + duration
+        state["consecutive_failures"] = 0
+
     def mark_attempt(self, provider_key: str) -> None:
         state = self.ensure_provider_state(provider_key)
         state["attempts"] += 1
@@ -135,12 +142,21 @@ class StateStore:
     def get_user_prompts(self, user_id: str) -> int:
         if not user_id:
             return 0
+        self._ensure_user_reset()
         return self.user_usage.get(user_id, 0)
 
     def increment_user_prompt(self, user_id: str) -> None:
         if not user_id:
             return
+        self._ensure_user_reset()
         self.user_usage[user_id] = self.get_user_prompts(user_id) + 1
+
+    def _ensure_user_reset(self) -> None:
+        """Reset user prompt counters daily so free-tier limits reset at midnight UTC."""
+        today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+        if not hasattr(self, '_user_usage_date') or today != self._user_usage_date:
+            self.user_usage.clear()
+            self._user_usage_date = today
 
     # ── Telemetry methods used by admin API ──────────────────────
 

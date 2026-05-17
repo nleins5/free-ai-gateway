@@ -34,7 +34,11 @@ def _build_engine():
     return create_async_engine(
         clean_url,
         echo=False,
-        pool_pre_ping=True,
+        pool_pre_ping=True,       # Detect stale connections before use
+        pool_size=5,              # Base pool connections
+        max_overflow=10,          # Extra connections under load
+        pool_recycle=1800,        # Recycle connections every 30min (prevents Neon/Supabase idle timeouts)
+        pool_timeout=10,          # Wait max 10s for a connection from pool
         connect_args={"ssl": ssl_context},
     )
 

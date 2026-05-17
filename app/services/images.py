@@ -32,25 +32,32 @@ class ImageService:
         clean_prompt = re.sub(r"\s+", " ", prompt).strip()
         compiled_prompt = prepare_image_prompt(clean_prompt)
         
+        errors = []
         try:
             # Try NVIDIA
             nv_image = await self._image_from_nvidia(compiled_prompt)
             if nv_image:
                 return nv_image
+        except Exception as e:
+            errors.append(f"nvidia: {e}")
 
+        try:
             # Try Cloudflare
             cf_image = await self._image_from_cloudflare(compiled_prompt)
             if cf_image:
                 return cf_image
-            
+        except Exception as e:
+            errors.append(f"cloudflare: {e}")
+
+        try:
             # Try HuggingFace
             hf_image = await self._image_from_huggingface(compiled_prompt)
             if hf_image:
                 return hf_image
-        except Exception:
-            pass
+        except Exception as e:
+            errors.append(f"huggingface: {e}")
 
-        # Fallback to Pollinations
+        # Fallback to Pollinations (always available, no API key needed)
         encoded_prompt = urllib.parse.quote(compiled_prompt)
         seed = random.randint(1, 999999)
         source_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={seed}&model=flux"
@@ -60,6 +67,7 @@ class ImageService:
             "original_prompt": clean_prompt,
             "translated_prompt": compiled_prompt,
             "data": [{"url": source_url}],
+            "fallback_reason": "; ".join(errors) if errors else "primary providers skipped",
         }
 
     async def _image_from_nvidia(self, prompt: str) -> Optional[Dict[str, Any]]:
@@ -75,74 +83,65 @@ class ImageService:
             "steps": 25
         }
         
-        try:
-            response = await self.http_client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {nv_token}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                },
-                json=payload
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if "artifacts" in data and len(data["artifacts"]) > 0:
-                    img_b64 = data["artifacts"][0]["base64"]
-                    return {
-                        "provider": "NVIDIA (FLUX.1-dev VIP)",
-                        "data": [{"url": f"data:image/jpeg;base64,{img_b64}"}]
-                    }
-        except Exception:
-            pass
+        response = await self.http_client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {nv_token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            json=payload
+        )
+        if response.status_code == 200:
+            data = response.json()
+            if "artifacts" in data and len(data["artifacts"]) > 0:
+                img_b64 = data["artifacts"][0]["base64"]
+                return {
+                    "provider": "NVIDIA (FLUX.1-dev VIP)",
+                    "data": [{"url": f"data:image/jpeg;base64,{img_b64}"}]
+                }
         return None
 
     async def _image_from_cloudflare(self, prompt: str) -> Optional[Dict[str, Any]]:
         cf_account = os.getenv("CLOUDFLARE_ACCOUNT_ID")
-        cf_token = os.getenv("CLOUDFLARE_API_TOKEN")
+        cf_token = os.getenv("CLOUDFLARE_API_KEY") or os.getenv("CLOUDFLARE_API_TOKEN")
         if not cf_account or not cf_token:
             return None
 
         url = f"https://api.cloudflare.com/client/v4/accounts/{cf_account}/ai/run/@cf/black-forest-labs/flux-1-schnell"
-        try:
-            response = await self.http_client.post(
-                url,
-                headers={"Authorization": f"Bearer {cf_token}"},
-                json={"prompt": prompt}
-            )
-            if response.status_code == 200:
-                import base64
-                img_b64 = base64.b64encode(response.content).decode("utf-8")
-                return {
-                    "provider": "cloudflare",
-                    "data": [{"url": f"data:image/png;base64,{img_b64}"}]
-                }
-        except Exception:
-            pass
+        response = await self.http_client.post(
+            url,
+            headers={"Authorization": f"Bearer {cf_token}"},
+            json={"prompt": prompt}
+        )
+        if response.status_code == 200:
+            import base64
+            img_b64 = base64.b64encode(response.content).decode("utf-8")
+            return {
+                "provider": "cloudflare",
+                "data": [{"url": f"data:image/png;base64,{img_b64}"}]
+            }
         return None
 
     async def _image_from_huggingface(self, prompt: str) -> Optional[Dict[str, Any]]:
-        hf_token = os.getenv("HUGGINGFACE_TOKEN")
+        hf_token = os.getenv("HUGGINGFACE_API_KEY") or os.getenv("HUGGINGFACE_TOKEN")
         if not hf_token:
             return None
         
-        model_id = "black-forest-labs/FLUX.1-schnell"
+        model_id = os.getenv("HUGGINGFACE_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
         url = f"https://api-inference.huggingface.co/models/{model_id}"
-        try:
-            response = await self.http_client.post(
-                url,
-                headers={"Authorization": f"Bearer {hf_token}"},
-                json={"inputs": prompt}
-            )
-            if response.status_code == 200:
-                import base64
-                img_b64 = base64.b64encode(response.content).decode("utf-8")
-                return {
-                    "provider": "huggingface",
-                    "data": [{"url": f"data:image/png;base64,{img_b64}"}]
-                }
-        except Exception:
-            pass
+        response = await self.http_client.post(
+            url,
+            headers={"Authorization": f"Bearer {hf_token}"},
+            json={"inputs": prompt}
+        )
+        if response.status_code == 200:
+            import base64
+            img_b64 = base64.b64encode(response.content).decode("utf-8")
+            return {
+                "provider": "huggingface",
+                "data": [{"url": f"data:image/png;base64,{img_b64}"}]
+            }
         return None
 
 image_service = ImageService()

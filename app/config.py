@@ -8,8 +8,10 @@ load_dotenv()
 
 # --- CONSTANTS ---
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "changeme")
+GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")  # Shared secret for Vercel↔Render auth
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 PROVIDERS_JSON_PATH = os.getenv("PROVIDERS_JSON_PATH", "providers.json")
-REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "8"))
+REQUEST_TIMEOUT_S = float(os.getenv("REQUEST_TIMEOUT_S", "15"))
 IMAGE_MAX_WAIT_MS = max(int(os.getenv("IMAGE_MAX_WAIT_MS", "9500")), 1000)
 MAX_RETRIES_PER_PROVIDER = max(int(os.getenv("MAX_RETRIES_PER_PROVIDER", "1")), 0)
 PROVIDER_FAILURE_THRESHOLD = max(int(os.getenv("PROVIDER_FAILURE_THRESHOLD", "2")), 1)
@@ -23,10 +25,11 @@ RAG_TOP_K = max(int(os.getenv("RAG_TOP_K", "4")), 1)
 RAG_MAX_CHUNK_CHARS = max(int(os.getenv("RAG_MAX_CHUNK_CHARS", "900")), 200)
 RAG_CHUNK_OVERLAP_CHARS = max(int(os.getenv("RAG_CHUNK_OVERLAP_CHARS", "120")), 0)
 APP_NAME = os.getenv("APP_NAME", "free-ai-gateway")
-ROUTING_MODE = "round_robin"  # Hardcoded: ensures all providers get used evenly
+ROUTING_MODE = os.getenv("ROUTING_MODE", "weighted").strip().lower()
 
 # Cost per 1M tokens (input, output)
 COST_PER_1M: Dict[str, Tuple[float, float]] = {
+    # Core providers
     "groq": (0.05, 0.10),
     "gemini": (0.075, 0.30),
     "github": (0.0, 0.0),
@@ -44,24 +47,49 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
     "nvidia_33": (0.0, 0.0),
     "nvidia_77": (0.0, 0.0),
     "nvidia_custom": (0.0, 0.0),
-    "chutes": (0.0, 0.0),
-    "novita": (0.0, 0.0),
+    # New free providers
+    "deepseek": (0.0, 0.0),
+    "perplexity": (0.0, 0.0),
+    "mistral": (0.0, 0.0),
+    "vertex": (0.0, 0.0),
+    "cohere": (0.0, 0.0),
+    "ai21": (0.0, 0.0),
+    "anthropic": (0.0, 0.0),
+    "openai": (0.0, 0.0),
+    "zeroone": (0.0, 0.0),
+    "alibaba": (0.0, 0.0),
+    "moonshot": (0.0, 0.0),
+    "stepfun": (0.0, 0.0),
+    "zhipu": (0.0, 0.0),
+    "baichuan": (0.0, 0.0),
+    "grok": (0.0, 0.0),
+    "qwen": (0.0, 0.0),
+    "hunyuan": (0.0, 0.0),
+    "jina": (0.0, 0.0),
+    "yi": (0.0, 0.0),
+    "fireworks": (0.0, 0.0),
+    "nebius": (0.0, 0.0),
+    "scalr": (0.0, 0.0),
     "deepinfra": (0.0, 0.0),
+    "novita": (0.0, 0.0),
+    "chutes": (0.0, 0.0),
 }
 
 # --- DYNAMIC STATE ---
 # These are loaded from providers.json and updated via reload_config()
-_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "github,cerebras,huggingface,sambanova,groq,gemini,cloudflare,openrouter,chutes,novita,deepinfra,freetheai").split(",") if s.strip()]
+_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77", "nvidia_custom", "cerebras", "sambanova", "openrouter", "together", "xai"],
-    "chat": ["groq", "gemini", "github", "deepinfra", "chutes", "huggingface", "cloudflare", "novita", "nvidia", "nvidia_77", "nvidia_custom", "cerebras", "sambanova", "openrouter", "together", "xai"],
-    "research": ["github", "gemini", "deepinfra", "chutes", "claude", "xai", "nvidia", "nvidia_77", "nvidia_custom", "novita", "groq", "huggingface", "cerebras", "sambanova", "openrouter", "together"],
-    "code": ["github", "deepinfra", "chutes", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "nvidia_custom", "novita", "gemini", "sambanova", "openrouter", "together", "xai"],
-    "vision": ["github", "gemini", "deepinfra", "nvidia", "nvidia_77", "groq"],
+    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "mistral", "deepinfra", "novita"],
+    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "zhipu", "deepinfra", "novita"],
+    "research": ["github", "gemini", "claude", "xai", "nvidia", "perplexity", "deepseek", "chutes"],
+    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "deepseek", "anthropic", "deepinfra", "novita", "chutes"],
+    "vision": ["github", "gemini", "anthropic"],
     "image": ["cloudflare", "huggingface", "freetheai"],
-    "gemma": ["groq", "openrouter", "huggingface", "deepinfra", "novita", "cerebras", "sambanova", "together"],
-    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra", "gemini", "github", "chutes", "novita", "huggingface", "cerebras", "openrouter", "together", "xai"],
-    "reasoning": ["groq", "deepinfra", "chutes", "nvidia", "nvidia_77", "nvidia_custom", "gemini", "github", "novita", "huggingface", "cerebras", "sambanova", "openrouter", "together", "xai"],
+    "gemma": ["groq", "openrouter", "huggingface"],
+    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"],
+    "fast": ["groq", "cerebras", "sambanova", "deepseek", "mistral", "novita"],
+    "cheap": ["github", "freetheai", "cloudflare", "huggingface", "zhipu"],
+    "smart": ["claude", "gemini", "deepseek-r1", "grok", "chutes"]
 }
 
 class Settings:

@@ -1,39 +1,58 @@
 import time
 import os
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
+# ── Structured Logging ────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-5s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+# Silence noisy libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logger = logging.getLogger("gateway")
+
 from app.api.v1 import chat, images, rag, audio, conversations, users
 from app.api import admin
-from app.config import settings, RAG_STORE_PATH
+from app.config import settings, RAG_STORE_PATH, ALLOWED_ORIGINS
 from app.core.state import StateStore
 from app.services.rag import SimpleRAGStore, RAGService
 from app.services.router import RouterService
 from app.database import init_db
+from app.dependencies import verify_gateway
 
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize Database
-    await init_db()
-    
-    # Initialize StateStore
+    # Skip DB initialization in serverless environments
+    is_serverless = os.getenv('VERCEL') == '1'
+
+    if not is_serverless:
+        # Initialize Database only in local/dev
+        await init_db()
+
+        # Initialize RAG Store and Service (local only)
+        rag_store = SimpleRAGStore(RAG_STORE_PATH)
+        await rag_store.initialize()
+        app.state.rag_service = RAGService(rag_store)
+    else:
+        # Serverless: use in-memory storage
+        app.state.rag_service = None
+
+    # Initialize StateStore and RouterService (these work in serverless)
     state_store = StateStore()
     app.state.state_store = state_store
-    
-    # Initialize RouterService
     app.state.router_service = RouterService(state_store)
-    
-    # Initialize RAG Store and Service
-    rag_store = SimpleRAGStore(RAG_STORE_PATH)
-    await rag_store.initialize()
-    app.state.rag_service = RAGService(rag_store)
-    
+
     yield
-    # Any cleanup can go here
+    # Cleanup
 
 from fastapi.responses import HTMLResponse
 
@@ -158,40 +177,59 @@ async def custom_api_docs():
     """
     return HTMLResponse(content=html_content)
 
-# CORS
+# CORS — locked to allowed origins (set ALLOWED_ORIGINS env var in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routes
-app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
-app.include_router(images.router, prefix="/v1/images", tags=["Images"])
-app.include_router(rag.router, prefix="/v1/rag", tags=["RAG"])
-app.include_router(audio.router, prefix="/v1/audio", tags=["Audio"])
-app.include_router(conversations.router, prefix="/v1/conversations", tags=["Conversations"])
-app.include_router(users.router, prefix="/v1/users", tags=["Users"])
+# Routes — all /v1/* routes require gateway secret in production
+from fastapi import Depends
+
+app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"], dependencies=[Depends(verify_gateway)])
+app.include_router(images.router, prefix="/v1/images", tags=["Images"], dependencies=[Depends(verify_gateway)])
+app.include_router(rag.router, prefix="/v1/rag", tags=["RAG"], dependencies=[Depends(verify_gateway)])
+app.include_router(audio.router, prefix="/v1/audio", tags=["Audio"], dependencies=[Depends(verify_gateway)])
+app.include_router(conversations.router, prefix="/v1/conversations", tags=["Conversations"], dependencies=[Depends(verify_gateway)])
+app.include_router(users.router, prefix="/v1/users", tags=["Users"], dependencies=[Depends(verify_gateway)])
 app.include_router(admin.router, prefix="/v1/admin", tags=["Admin"])
 
 
 
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
+    state_store = request.app.state.state_store
+    all_states = state_store.get_all_states()
+    providers = all_states.get("providers", {})
+    healthy = sum(1 for p in providers.values() if not p.get("on_cooldown", False))
+    total = len(providers)
     return {
         "status": "online",
         "timestamp": time.time(),
-        "version": "2.0.0"
+        "version": "2.1.0",
+        "providers": {"healthy": healthy, "total": total},
+        "daily_cost_usd": all_states.get("total_cost_usd", 0),
     }
+
+@app.middleware("http")
+async def add_request_timing(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed = (time.perf_counter() - start) * 1000
+    response.headers["X-Response-Time"] = f"{elapsed:.0f}ms"
+    if elapsed > 5000:  # Log slow requests (>5s)
+        logger.warning(f"Slow request: {request.method} {request.url.path} took {elapsed:.0f}ms")
+    return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    # Log the exception here
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Internal Server Error: {str(exc)}"}
+        content={"detail": "Internal Server Error. Please try again later."}
     )
 
 # Serve UI
