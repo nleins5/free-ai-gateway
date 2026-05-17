@@ -42,7 +42,6 @@
     "deepinfra",
     "novita",
     "chutes",
-    "cliproxy",
     "ninerouter"
   ],
   "task_tiers": {
@@ -58,7 +57,6 @@
       "mistral",
       "deepinfra",
       "novita",
-      "cliproxy",
       "ninerouter"
     ],
     "chat": [
@@ -73,7 +71,6 @@
       "zhipu",
       "deepinfra",
       "novita",
-      "cliproxy",
       "ninerouter"
     ],
     "research": [
@@ -136,7 +133,6 @@
       "deepinfra",
       "novita",
       "chutes",
-      "cliproxy",
       "ninerouter"
     ],
     "reasoning": [
@@ -170,14 +166,12 @@
     "vision": [
       "github",
       "gemini",
-      "anthropic",
-      "cliproxy"
+      "anthropic"
     ],
     "image": [
       "cloudflare",
       "huggingface",
-      "freetheai",
-      "cliproxy"
+      "freetheai"
     ],
     "gemma": [
       "groq",
@@ -274,7 +268,6 @@
     "deepinfra": 2,
     "novita": 2,
     "chutes": 1,
-    "cliproxy": 2,
     "ninerouter": 2
   },
   "budget": {

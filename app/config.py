@@ -77,14 +77,14 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
 
 # --- DYNAMIC STATE ---
 # These are loaded from providers.json and updated via reload_config()
-_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes,cliproxy,ninerouter").split(",") if s.strip()]
+_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes,ninerouter").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "mistral", "deepinfra", "novita", "cliproxy", "ninerouter"],
-    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "zhipu", "deepinfra", "novita", "cliproxy", "ninerouter"],
+    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "mistral", "deepinfra", "novita", "ninerouter"],
+    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "zhipu", "deepinfra", "novita", "ninerouter"],
     "research": ["github", "gemini", "claude", "xai", "nvidia", "perplexity", "deepseek", "chutes", "ninerouter"],
-    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "deepseek", "anthropic", "deepinfra", "novita", "chutes", "cliproxy", "ninerouter"],
-    "vision": ["github", "gemini", "anthropic", "cliproxy"],
-    "image": ["cloudflare", "huggingface", "freetheai", "cliproxy"],
+    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "deepseek", "anthropic", "deepinfra", "novita", "chutes", "ninerouter"],
+    "vision": ["github", "gemini", "anthropic"],
+    "image": ["cloudflare", "huggingface", "freetheai"],
     "gemma": ["groq", "openrouter", "huggingface"],
     "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"],
     "interview": ["groq", "gemini", "github", "deepseek", "mistral", "deepinfra", "novita"],
