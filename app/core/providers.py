@@ -350,4 +350,20 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         model_env="CHUTES_MODEL",
         default_model="deepseek-ai/DeepSeek-V3-0324",
     ),
+    "cliproxy": Provider(
+        key="cliproxy",
+        name="CLIProxy",
+        base_url=os.getenv("CLIPROXY_BASE_URL", "https://api.cliproxy.com/v1"),
+        api_key_env="CLIPROXY_API_KEY",
+        model_env="CLIPROXY_MODEL",
+        default_model="gpt-4o",
+    ),
+    "ninerouter": Provider(
+        key="ninerouter",
+        name="9Router",
+        base_url=os.getenv("NINEROUTER_BASE_URL", "http://localhost:20128/v1"),
+        api_key_env="NINEROUTER_API_KEY",
+        model_env="NINEROUTER_MODEL",
+        default_model="claude-3-5-sonnet-20241022",
+    ),
 }

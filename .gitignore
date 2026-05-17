@@ -45,3 +45,5 @@ Thumbs.db
 # .planning/
 
 d2l-zh/
+.vercel
+.env*.local
