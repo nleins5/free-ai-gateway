@@ -222,6 +222,7 @@ async def unified_chat_stream(
     req: UnifiedAIChatRequest,
     router_svc: RouterService = Depends(get_router_service),
     rag_svc: RAGService = Depends(get_rag_service),
+    db: AsyncSession = Depends(get_db),
     x_api_key: str = Header(None, alias="X-API-Key"),
 ):
     """
@@ -264,6 +265,10 @@ async def unified_chat_stream(
     messages.append({"role": "user", "content": req.query})
 
     async def event_stream() -> AsyncGenerator[str, None]:
+        import time as _time
+        start_ts = _time.time()
+        final_provider = ''
+        final_model = ''
         try:
             async for chunk in router_svc.chat_stream_with_failover(
                 messages=messages,
@@ -287,11 +292,31 @@ async def unified_chat_stream(
                     delta = getattr(choices[0], "delta", None)
                     content = getattr(delta, "content", None) if delta else None
                     finish_reason = getattr(choices[0], "finish_reason", None)
+                    if chunk.get('provider'): final_provider = chunk['provider']
+                    if chunk.get('model'): final_model = chunk['model']
 
                     if content:
-                        yield f"data: {json_lib.dumps({'token': content, 'provider': chunk.get('provider', '')})}\n\n"
+                        yield f"data: {json_lib.dumps({'token': content, 'provider': final_provider})}\n\n"
                     if finish_reason == "stop":
-                        yield f"data: {json_lib.dumps({'done': True, 'provider': chunk.get('provider', ''), 'model': chunk.get('model', '')})}\n\n"
+                        latency_ms = (_time.time() - start_ts) * 1000
+                        # Log to DB asynchronously (fire-and-forget style)
+                        try:
+                            from app.config import COST_PER_1M
+                            rates = COST_PER_1M.get(final_provider, (0.0, 0.0))
+                            log = RequestLog(
+                                user_id=req.user_id,
+                                provider=final_provider or 'unknown',
+                                model=final_model or 'unknown',
+                                latency_ms=latency_ms,
+                                cost_usd=0.0,
+                                task_type=req.task or 'general',
+                                status='success',
+                            )
+                            db.add(log)
+                            await db.commit()
+                        except Exception:
+                            pass
+                        yield f"data: {json_lib.dumps({'done': True, 'provider': final_provider, 'model': final_model})}\n\n"
                         return
 
         except Exception as exc:
