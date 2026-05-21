@@ -20,6 +20,7 @@ logger = logging.getLogger("gateway")
 
 from app.api.v1 import chat, images, rag, audio, conversations, users
 from app.api import admin
+from app.api import ollama
 from app.config import settings, RAG_STORE_PATH, ALLOWED_ORIGINS
 from app.core.state import StateStore
 from app.services.rag import SimpleRAGStore, RAGService
@@ -245,6 +246,9 @@ app.include_router(audio.router, prefix="/v1/audio", tags=["Audio"], dependencie
 app.include_router(conversations.router, prefix="/v1/conversations", tags=["Conversations"], dependencies=[Depends(verify_gateway)])
 app.include_router(users.router, prefix="/v1/users", tags=["Users"], dependencies=[Depends(verify_gateway)])
 app.include_router(admin.router, prefix="/v1/admin", tags=["Admin"])
+
+# Ollama-compatible endpoints — no auth required, drop-in replacement
+app.include_router(ollama.router, prefix="/api", tags=["Ollama Compat"])
 
 
 
