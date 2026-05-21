@@ -24,6 +24,35 @@ const ChatMessage = ({ msg }) => {
         }
     }
     
+    // Full-bleed 3D scene — no text, no padding, just the render
+    if (htmlContent) {
+        return (
+            <div className="flex flex-col w-full">
+                <div className="w-full rounded-2xl overflow-hidden border border-graphite shadow-2xl bg-black" style={{ height: '600px' }}>
+                    <iframe
+                        srcDoc={htmlContent}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                        sandbox="allow-scripts allow-same-origin"
+                        title="3D Render"
+                    />
+                </div>
+                {msg.latency && (
+                    <div className="flex items-center gap-3 px-2 pt-2 flex-wrap">
+                        {msg.tierLabel && (
+                            <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${TIER_CONFIG[msg.tierKey]?.bg || ''} ${TIER_CONFIG[msg.tierKey]?.color || 'text-ghost/50'}`}>
+                                {msg.tierLabel}
+                            </span>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-plasma" />
+                            <span className="font-mono text-xs text-plasma/70">{msg.provider} • {msg.latency}ms</span>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className={`flex gap-4 p-6 ${isAi ? 'bg-void' : ''}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isAi ? 'bg-plasma/20 text-plasma' : 'bg-graphite text-ghost/60'}`}>
@@ -38,16 +67,6 @@ const ChatMessage = ({ msg }) => {
                 ) : (
                     <div className="font-sans text-ghost/90 leading-relaxed whitespace-pre-wrap">
                         {cleanContent}
-                        {htmlContent && (
-                            <div className="mt-4 rounded-xl overflow-hidden border border-graphite shadow-2xl bg-white w-full" style={{ height: '450px' }}>
-                                <iframe
-                                    srcDoc={htmlContent}
-                                    style={{ width: '100%', height: '100%', border: 'none' }}
-                                    sandbox="allow-scripts allow-same-origin"
-                                    title="3D Render"
-                                />
-                            </div>
-                        )}
                     </div>
                 )}
                 {msg.latency && (
@@ -58,7 +77,7 @@ const ChatMessage = ({ msg }) => {
                             </span>
                         )}
                         <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-plasma"></div>
+                            <div className="w-1.5 h-1.5 rounded-full bg-plasma" />
                             <span className="font-mono text-xs text-plasma/70">{msg.provider} • {msg.latency}ms</span>
                         </div>
                     </div>
