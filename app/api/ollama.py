@@ -1,18 +1,13 @@
 """
-Ollama-compatible endpoint — /api/generate & /api/chat
+Ollama-compatible endpoint — /api/generate & /api/chat & /api/tags
 
-Allows any system that calls Ollama to drop in this gateway URL
-with zero code changes. Just replace the base URL.
-
-Supported formats:
-  POST /api/generate  {"model":"gemma4:latest","prompt":"..."}
-  POST /api/chat      {"model":"gemma4:latest","messages":[...]}
-  GET  /api/tags      → list available models
+Drop-in replacement for any system calling an Ollama server.
+Just change the base URL, zero other code changes needed.
 """
 
 from typing import Optional, List, Dict, Any, AsyncGenerator
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import json
 import time
@@ -24,7 +19,7 @@ from app.core.providers import PROVIDER_REGISTRY
 router = APIRouter()
 
 
-# ── Request models ─────────────────────────────────────────────────────────
+# ── Request models ─────────────────────────────────────────────
 
 class OllamaGenerateRequest(BaseModel):
     model: str = "gemma4:latest"
@@ -46,168 +41,177 @@ class OllamaChatRequest(BaseModel):
     options: Optional[Dict[str, Any]] = None
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
+# ── Response helpers ───────────────────────────────────────────
 
-def _ollama_response(model: str, content: str, done: bool = True) -> dict:
+def _ts() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _gen_resp(model: str, text: str, done: bool = True) -> dict:
+    return {"model": model, "created_at": _ts(), "response": text, "done": done}
+
+
+def _chat_resp(model: str, text: str, done: bool = True) -> dict:
     return {
         "model": model,
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "response": content,
+        "created_at": _ts(),
+        "message": {"role": "assistant", "content": text},
         "done": done,
-        "done_reason": "stop" if done else None,
-        "context": [],
-        "total_duration": 0,
-        "eval_count": len(content.split()),
     }
 
 
-def _ollama_chat_response(model: str, content: str, done: bool = True) -> dict:
-    return {
-        "model": model,
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "message": {"role": "assistant", "content": content},
-        "done": done,
-        "done_reason": "stop" if done else None,
-    }
-
-
-# ── GET /api/tags — list models ────────────────────────────────────────────
+# ── GET /api/tags ──────────────────────────────────────────────
 
 @router.get("/tags")
 async def list_models():
-    """Ollama-compatible model list."""
-    models = []
-    for key, provider in PROVIDER_REGISTRY.items():
-        models.append({
-            "name": provider.default_model,
-            "model": provider.default_model,
+    models = [
+        {
+            "name": p.default_model,
+            "model": p.default_model,
             "modified_at": "2025-01-01T00:00:00Z",
             "size": 0,
-            "digest": key,
-            "details": {
-                "family": key,
-                "parameter_size": "unknown",
-                "quantization_level": "unknown",
-            }
-        })
+            "digest": k,
+            "details": {"family": k, "parameter_size": "unknown"},
+        }
+        for k, p in PROVIDER_REGISTRY.items()
+    ]
     return {"models": models}
 
 
-# ── POST /api/generate — Ollama generate format ────────────────────────────
+# ── Shared stream helper ───────────────────────────────────────
+
+async def _run_stream(router_svc, messages, temperature, max_tokens, fmt):
+    """
+    Consume gateway stream chunks and yield Ollama-format NDJSON.
+    fmt: "generate" | "chat"
+    """
+    model_used = "gateway"
+    async for chunk in router_svc.chat_stream_with_failover(
+        messages=messages,
+        task="general",
+        user_tier="free",
+        temperature=temperature,
+        max_tokens=max_tokens,
+    ):
+        # Control dict — error / info / done signal
+        if "error" in chunk:
+            yield json.dumps({"error": chunk.get("message", "error")}) + "\n"
+            return
+        if "info" in chunk:
+            continue
+
+        # Token chunk: {"choices": [...], "provider": ..., "model": ...}
+        choices = chunk.get("choices", [])
+        if not choices:
+            continue
+        model_used = chunk.get("model", model_used)
+        try:
+            delta = choices[0].delta
+            token = delta.content or ""
+            finish = choices[0].finish_reason
+        except Exception:
+            continue
+
+        if token:
+            if fmt == "generate":
+                yield json.dumps(_gen_resp(model_used, token, done=False)) + "\n"
+            else:
+                yield json.dumps(_chat_resp(model_used, token, done=False)) + "\n"
+
+        if finish == "stop":
+            if fmt == "generate":
+                yield json.dumps(_gen_resp(model_used, "", done=True)) + "\n"
+            else:
+                yield json.dumps(_chat_resp(model_used, "", done=True)) + "\n"
+            return
+
+
+# ── POST /api/generate ─────────────────────────────────────────
 
 @router.post("/generate")
 async def ollama_generate(
     req: OllamaGenerateRequest,
     router_svc: RouterService = Depends(get_router_service),
 ):
-    """
-    Drop-in replacement for Ollama /api/generate.
-    Routes through the gateway's failover system.
-    """
     messages = []
     if req.system:
         messages.append({"role": "system", "content": req.system})
     messages.append({"role": "user", "content": req.prompt})
 
-    options = req.options or {}
-    temperature = options.get("temperature", 0.7)
-    max_tokens = options.get("num_predict", options.get("max_tokens", None))
+    opts = req.options or {}
+    temperature = float(opts.get("temperature", 0.7))
+    max_tokens = opts.get("num_predict") or opts.get("max_tokens") or None
 
     if req.stream:
-        async def event_stream() -> AsyncGenerator[str, None]:
-            full = ""
-            try:
-                async for chunk in router_svc.chat_stream_with_failover(
-                    messages=messages,
-                    model_override=req.model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    user_tier="free",
-                ):
-                    if "error" in chunk:
-                        yield json.dumps({"error": chunk.get("message", "")}) + "\n"
-                        return
-                    if "info" in chunk:
-                        continue
-                    choices = chunk.get("choices", [])
-                    if choices:
-                        delta = getattr(choices[0], "delta", None)
-                        token = getattr(delta, "content", None) if delta else None
-                        finish = getattr(choices[0], "finish_reason", None)
-                        if token:
-                            full += token
-                            yield json.dumps(_ollama_response(req.model, token, done=False)) + "\n"
-                        if finish == "stop":
-                            yield json.dumps(_ollama_response(req.model, "", done=True)) + "\n"
-                            return
-            except Exception as e:
-                yield json.dumps({"error": str(e)}) + "\n"
+        return StreamingResponse(
+            _run_stream(router_svc, messages, temperature, max_tokens, "generate"),
+            media_type="application/x-ndjson",
+        )
 
-        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
-
-    # Non-streaming
-    response, meta = await router_svc.chat_with_failover(
+    # Non-streaming — collect via fake stream
+    full = ""
+    model_used = req.model
+    async for chunk in router_svc.chat_stream_with_failover(
         messages=messages,
-        model_override=req.model,
+        task="general",
+        user_tier="free",
         temperature=temperature,
         max_tokens=max_tokens,
-    )
-    content = response.choices[0].message.content or ""
-    return _ollama_response(req.model, content)
+    ):
+        if "error" in chunk:
+            return {"error": chunk.get("message", "error"), "done": True}
+        if "info" in chunk:
+            continue
+        choices = chunk.get("choices", [])
+        if choices:
+            model_used = chunk.get("model", model_used)
+            try:
+                token = choices[0].delta.content or ""
+                full += token
+            except Exception:
+                pass
+
+    return _gen_resp(model_used, full, done=True)
 
 
-# ── POST /api/chat — Ollama chat format ────────────────────────────────────
+# ── POST /api/chat ─────────────────────────────────────────────
 
 @router.post("/chat")
 async def ollama_chat(
     req: OllamaChatRequest,
     router_svc: RouterService = Depends(get_router_service),
 ):
-    """
-    Drop-in replacement for Ollama /api/chat.
-    Routes through the gateway's failover system.
-    """
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
-    options = req.options or {}
-    temperature = options.get("temperature", 0.7)
-    max_tokens = options.get("num_predict", options.get("max_tokens", None))
+    opts = req.options or {}
+    temperature = float(opts.get("temperature", 0.7))
+    max_tokens = opts.get("num_predict") or opts.get("max_tokens") or None
 
     if req.stream:
-        async def event_stream() -> AsyncGenerator[str, None]:
-            try:
-                async for chunk in router_svc.chat_stream_with_failover(
-                    messages=messages,
-                    model_override=req.model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    user_tier="free",
-                ):
-                    if "error" in chunk:
-                        yield json.dumps({"error": chunk.get("message", "")}) + "\n"
-                        return
-                    if "info" in chunk:
-                        continue
-                    choices = chunk.get("choices", [])
-                    if choices:
-                        delta = getattr(choices[0], "delta", None)
-                        token = getattr(delta, "content", None) if delta else None
-                        finish = getattr(choices[0], "finish_reason", None)
-                        if token:
-                            yield json.dumps(_ollama_chat_response(req.model, token, done=False)) + "\n"
-                        if finish == "stop":
-                            yield json.dumps(_ollama_chat_response(req.model, "", done=True)) + "\n"
-                            return
-            except Exception as e:
-                yield json.dumps({"error": str(e)}) + "\n"
+        return StreamingResponse(
+            _run_stream(router_svc, messages, temperature, max_tokens, "chat"),
+            media_type="application/x-ndjson",
+        )
 
-        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
-
-    # Non-streaming
-    response, meta = await router_svc.chat_with_failover(
+    full = ""
+    model_used = req.model
+    async for chunk in router_svc.chat_stream_with_failover(
         messages=messages,
-        model_override=req.model,
+        task="general",
+        user_tier="free",
         temperature=temperature,
         max_tokens=max_tokens,
-    )
-    content = response.choices[0].message.content or ""
-    return _ollama_chat_response(req.model, content)
+    ):
+        if "error" in chunk:
+            return {"error": chunk.get("message", "error"), "done": True}
+        if "info" in chunk:
+            continue
+        choices = chunk.get("choices", [])
+        if choices:
+            model_used = chunk.get("model", model_used)
+            try:
+                token = choices[0].delta.content or ""
+                full += token
+            except Exception:
+                pass
+
+    return _chat_resp(model_used, full, done=True)
