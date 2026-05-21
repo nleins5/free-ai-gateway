@@ -227,10 +227,16 @@ const Chat = () => {
         
         try {
             let res;
+            const gatewayKey = import.meta.env.VITE_GATEWAY_SECRET || '';
+            const standardHeaders = { 'Content-Type': 'application/json' };
+            if (gatewayKey) {
+                standardHeaders['X-Gateway-Key'] = gatewayKey;
+            }
+
             if (mode === 'image') {
                 res = await fetch(`${API_BASE}/v1/images/generations`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: standardHeaders,
                     body: JSON.stringify({ prompt: input })
                 });
             } else {
@@ -241,7 +247,7 @@ const Chat = () => {
                 
                 res = await fetch(`${API_BASE}/v1/chat/unified`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: standardHeaders,
                     body: JSON.stringify({
                         query: input,
                         user_id: userId,
@@ -442,8 +448,15 @@ const Chat = () => {
                         const extension = finalMimeType.includes('webm') ? 'webm' : 'mp4';
                         formData.append('file', audioBlob, `audio.${extension}`);
                         
+                        const gatewayKey = import.meta.env.VITE_GATEWAY_SECRET || '';
+                        const audioHeaders = {};
+                        if (gatewayKey) {
+                            audioHeaders['X-Gateway-Key'] = gatewayKey;
+                        }
+
                         const res = await fetch(`${API_BASE}/v1/audio/transcriptions`, {
                             method: 'POST',
+                            headers: audioHeaders,
                             body: formData
                         });
                         
