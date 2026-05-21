@@ -47,3 +47,6 @@ Thumbs.db
 d2l-zh/
 .vercel
 .env*.local
+env_for_boss.txt
+.env.vercel
+.Rhistory

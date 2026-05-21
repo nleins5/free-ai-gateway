@@ -79,21 +79,21 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
 
 # --- DYNAMIC STATE ---
 # These are loaded from providers.json and updated via reload_config()
-_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes,ninerouter,doubleword").split(",") if s.strip()]
+_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,deepseek,mistral,zhipu,deepinfra,novita,chutes").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "cloudflare", "github", "openrouter", "together", "huggingface", "doubleword", "nvidia", "ninerouter"],
-    "chat": ["groq", "gemini", "cloudflare", "github", "openrouter", "together", "huggingface", "doubleword", "nvidia", "ninerouter"],
-    "research": ["doubleword", "openrouter", "together", "nvidia", "ninerouter", "cloudflare"],
-    "code": ["doubleword", "openrouter", "together", "nvidia", "cloudflare", "ninerouter"],
-    "vision": ["github", "gemini", "anthropic"],
-    "image": ["cloudflare", "huggingface", "freetheai"],
+    "general": ["groq", "gemini", "cloudflare", "github", "openrouter", "huggingface", "deepinfra"],
+    "chat": ["groq", "gemini", "cloudflare", "github", "openrouter", "huggingface", "deepinfra"],
+    "research": ["groq", "gemini", "openrouter", "deepinfra", "novita", "cloudflare"],
+    "code": ["groq", "gemini", "openrouter", "deepinfra", "novita", "cloudflare", "github"],
+    "vision": ["github", "gemini"],
+    "image": ["cloudflare", "huggingface"],
     "gemma": ["groq", "openrouter", "huggingface"],
-    "omniverse": ["nvidia", "nvidia_custom", "doubleword", "together", "openrouter", "groq", "gemini", "cloudflare", "github"],
-    "interview": ["cloudflare", "openrouter", "together", "doubleword", "nvidia"],
-    "english": ["cloudflare", "openrouter", "together", "doubleword", "nvidia"],
-    "fast": ["cloudflare", "openrouter", "together", "doubleword"],
-    "cheap": ["cloudflare", "openrouter", "freetheai", "huggingface"],
-    "smart": ["doubleword", "ninerouter", "openrouter", "together", "nvidia"]
+    "omniverse": ["deepinfra", "novita", "groq", "gemini", "openrouter", "cloudflare", "github"],
+    "interview": ["cloudflare", "openrouter", "groq", "deepinfra"],
+    "english": ["cloudflare", "openrouter", "groq", "deepinfra"],
+    "fast": ["groq", "cloudflare", "openrouter", "cerebras"],
+    "cheap": ["cloudflare", "openrouter", "huggingface"],
+    "smart": ["deepinfra", "novita", "openrouter", "groq", "gemini"]
 }
 
 class Settings:

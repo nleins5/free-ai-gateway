@@ -50,7 +50,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         base_url="https://generativelanguage.googleapis.com/v1beta/openai",
         api_key_env="GEMINI_API_KEY",
         model_env="GEMINI_MODEL",
-        default_model="gemini-flash-latest",
+        default_model="gemini-1.5-flash-latest",
     ),
     "cerebras": Provider(
         key="cerebras",

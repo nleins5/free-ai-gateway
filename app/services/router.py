@@ -301,16 +301,16 @@ class RouterService:
                 detail=f"Daily budget limit of ${settings.budget_daily_limit_usd:.2f} exceeded."
             )
 
-        # User prompt tracking (free tier: 10 prompts/day)
+        # User prompt tracking (free tier: 100 prompts/session)
         if user_id:
             prompt_count = self.state_store.get_user_prompts(user_id)
-            if prompt_count >= 10:
+            if prompt_count >= 100:
                 raise HTTPException(
                     status_code=402,
-                    detail="Bạn đã sử dụng hết 10 lượt miễn phí. Vui lòng đăng nhập để tiếp tục."
+                    detail="Bạn đã sử dụng hết 100 lượt miễn phí. Vui lòng đăng nhập để tiếp tục."
                 )
             self.state_store.increment_user_prompt(user_id)
-            logger.info(f"User {user_id[:8]}... prompt #{prompt_count + 1}/10, task={task}")
+            logger.info(f"User {user_id[:8]}... prompt #{prompt_count + 1}/100, task={task}")
 
         # Resolve task tier → provider chain
         resolved_task = task or "general"
@@ -483,10 +483,10 @@ class RouterService:
         # User prompt tracking
         if user_id:
             prompt_count = self.state_store.get_user_prompts(user_id)
-            if prompt_count >= 10:
+            if prompt_count >= 100:
                 yield {
                     "error": "FreeLimitReached",
-                    "message": "Bạn đã sử dụng hết 10 lượt miễn phí. Vui lòng đăng nhập để tiếp tục."
+                    "message": "Bạn đã sử dụng hết 100 lượt miễn phí. Vui lòng đăng nhập để tiếp tục."
                 }
                 return
             self.state_store.increment_user_prompt(user_id)
