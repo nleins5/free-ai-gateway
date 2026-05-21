@@ -4,6 +4,12 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
+const TIER_CONFIG = {
+    vip: { label: 'VIP', color: 'text-amber-400', bg: 'bg-amber-400/10 border-amber-400/20' },
+    standard: { label: 'Standard', color: 'text-sky-400', bg: 'bg-sky-400/10 border-sky-400/20' },
+    free: { label: 'Free', color: 'text-ghost/40', bg: 'bg-ghost/5 border-ghost/10' },
+};
+
 const ChatMessage = ({ msg }) => {
     const isAi = msg.role === 'assistant';
     
@@ -45,9 +51,16 @@ const ChatMessage = ({ msg }) => {
                     </div>
                 )}
                 {msg.latency && (
-                    <div className="flex items-center gap-2 mt-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-plasma"></div>
-                        <span className="font-mono text-xs text-plasma/70">{msg.provider} • {msg.latency}ms</span>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        {msg.tierLabel && (
+                            <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${TIER_CONFIG[msg.tierKey]?.bg || ''} ${TIER_CONFIG[msg.tierKey]?.color || 'text-ghost/50'}`}>
+                                {msg.tierLabel}
+                            </span>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-plasma"></div>
+                            <span className="font-mono text-xs text-plasma/70">{msg.provider} • {msg.latency}ms</span>
+                        </div>
                     </div>
                 )}
             </div>
@@ -164,10 +177,22 @@ const Chat = () => {
     const [audioLevel, setAudioLevel] = useState(0);
     
     const [userId, setUserId] = useState('');
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userPlan, setUserPlan] = useState('free'); // 'free' | 'vip'
     const [showModal, setShowModal] = useState(false);
+    const [showLoginGate, setShowLoginGate] = useState(false);
     const [toast, setToast] = useState(null);
-    const [currentTier, setCurrentTier] = useState('vip');
     const [promptCount, setPromptCount] = useState(0);
+
+    // Derive userTier from login status + plan
+    const getUserTier = (loggedIn, plan, count) => {
+        if (loggedIn && plan === 'vip') return 'vip';
+        if (loggedIn) return 'free';
+        // Guest: tier depends on prompt count
+        if (count === 0) return 'vip';
+        if (count === 1) return 'standard';
+        return 'free';
+    };
 
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [activeSettingsTab, setActiveSettingsTab] = useState('activity');
@@ -196,8 +221,13 @@ const Chat = () => {
         
         const count = parseInt(localStorage.getItem('prompt_count') || '0', 10);
         setPromptCount(count);
-        if (count >= 10) {
-            setCurrentTier('general');
+
+        // Detect login state
+        const token = localStorage.getItem('auth_token');
+        const plan = localStorage.getItem('user_plan') || 'free';
+        if (token) {
+            setIsLoggedIn(true);
+            setUserPlan(plan);
         }
 
         // Warmup ping — wakes up Render before user sends first message
@@ -288,11 +318,13 @@ const Chat = () => {
                 .filter(m => !m.isImage && m.content)
                 .map(m => ({ role: m.role, content: m.content }));
 
+            const currentTierKey = getUserTier(isLoggedIn, userPlan, promptCount);
             const body = JSON.stringify({
                 query: currentInput,
                 user_id: userId,
                 task: mode,
                 use_rag: mode === 'research',
+                user_tier: isLoggedIn ? (userPlan === 'vip' ? 'vip' : 'free') : 'guest',
                 history
             });
 
@@ -349,9 +381,15 @@ const Chat = () => {
                     try { parsed = JSON.parse(raw); } catch { continue; }
 
                     if (parsed.error) {
+                        if (parsed.error === 'NeedLogin') {
+                            // Remove streaming placeholder, show login gate
+                            setMessages(prev => prev.filter(m => !m._streamingId));
+                            setShowLoginGate(true);
+                            break;
+                        }
                         const errMsg = parsed.error === 'FreeLimitReached'
-                            ? null  // handled by 402 above
-                            : `⚠️ ${parsed.message || parsed.error}`;
+                            ? null
+                            : `${parsed.message || parsed.error}`;
                         if (errMsg) {
                             setMessages(prev => prev.map(m =>
                                 m._streamingId === streamingId
@@ -380,9 +418,18 @@ const Chat = () => {
                     if (parsed.done) {
                         finalProvider = parsed.provider || finalProvider;
                         const latencyMs = Date.now() - startTime;
+                        const tierKey = getUserTier(isLoggedIn, userPlan, promptCount);
                         setMessages(prev => prev.map(m =>
                             m._streamingId === streamingId
-                                ? { ...m, content: fullContent, provider: finalProvider, latency: latencyMs, _streamingId: undefined }
+                                ? {
+                                    ...m,
+                                    content: fullContent,
+                                    provider: finalProvider,
+                                    latency: latencyMs,
+                                    tierKey,
+                                    tierLabel: TIER_CONFIG[tierKey]?.label,
+                                    _streamingId: undefined
+                                }
                                 : m
                         ));
 
@@ -1052,6 +1099,58 @@ const Chat = () => {
                                     <button 
                                         onClick={() => setShowModal(false)}
                                         className="w-full py-4 px-6 rounded-2xl border border-ghost/10 text-ghost/40 hover:text-ghost hover:bg-ghost/5 hover:border-ghost/20 transition-all duration-300 font-bold uppercase tracking-widest text-xs"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Login Gate — shown after 3 guest prompts */}
+                {showLoginGate && (
+                    <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
+                        <div className="bg-void border border-graphite p-10 rounded-[2.5rem] max-w-md w-full shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-plasma/40 to-transparent" />
+
+                            <div className="relative z-10">
+                                <p className="font-mono text-xs text-ghost/30 uppercase tracking-widest mb-6">Session limit reached</p>
+
+                                <h2 className="text-3xl font-black text-ghost mb-3 tracking-tight">Continue with an account</h2>
+                                <p className="text-ghost/50 text-sm leading-relaxed mb-8">
+                                    You've used your 3 trial prompts. Sign in to keep going — free accounts get unlimited access on our free-tier models.
+                                </p>
+
+                                {/* Tier comparison */}
+                                <div className="space-y-2 mb-8">
+                                    <div className="flex items-center justify-between py-3 px-4 rounded-xl border border-graphite bg-graphite/30">
+                                        <div>
+                                            <span className="text-ghost/90 font-semibold text-sm">Free account</span>
+                                            <p className="text-ghost/40 text-xs mt-0.5">Unlimited prompts · Free models</p>
+                                        </div>
+                                        <span className="font-mono text-xs text-ghost/40">$0 / mo</span>
+                                    </div>
+                                    <div className="flex items-center justify-between py-3 px-4 rounded-xl border border-plasma/30 bg-plasma/5">
+                                        <div>
+                                            <span className="text-plasma font-semibold text-sm">VIP</span>
+                                            <p className="text-ghost/40 text-xs mt-0.5">Unlimited · Best models · Priority routing</p>
+                                        </div>
+                                        <span className="font-mono text-xs text-plasma">$9 / mo</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3">
+                                    <button
+                                        onClick={() => navigate('/login')}
+                                        className="magnetic-btn group w-full relative overflow-hidden bg-plasma text-void font-bold rounded-2xl px-6 py-4 flex items-center justify-center tracking-widest uppercase text-sm hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(123,97,255,0.15)]"
+                                    >
+                                        <span className="absolute inset-0 bg-white/10 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                                        <span className="relative z-10">Sign in</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setShowLoginGate(false)}
+                                        className="w-full py-3 px-6 rounded-2xl text-ghost/30 hover:text-ghost/60 transition-colors text-xs uppercase tracking-widest"
                                     >
                                         Dismiss
                                     </button>

@@ -445,13 +445,21 @@ class RouterService:
         temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         task: Optional[str] = "general",
+        user_tier: Optional[str] = "guest",  # "guest" | "free" | "vip"
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Streaming version of chat_with_failover.
 
         Yields SSE-formatted events for real-time response streaming.
         Includes failover notification when switching providers.
+
+        Tier system:
+        - guest:  prompt 1 → VIP chain, prompt 2 → standard chain, prompt 3 → free chain, prompt 4+ → NeedLogin
+        - free:   always free chain (cloudflare, openrouter, huggingface…) — unlimited
+        - vip:    always VIP chain (deepinfra, novita, groq…) — unlimited
         """
+        from app.config import TIER_VIP_CHAIN, TIER_STANDARD_CHAIN, TIER_FREE_CHAIN
+
         # Special system prompts for specific tasks
         if task == "omniverse":
             sys_msg = {
@@ -480,20 +488,52 @@ class RouterService:
             }
             return
 
-        # User prompt tracking
-        if user_id:
-            prompt_count = self.state_store.get_user_prompts(user_id)
-            if prompt_count >= 100:
+        # ── Tier-based routing ──────────────────────────────────────────────
+        prompt_count = self.state_store.get_user_prompts(user_id) if user_id else 0
+
+        if user_tier == "vip":
+            # VIP users always get the best chain, unlimited
+            tier_chain = TIER_VIP_CHAIN
+            chain_label = "VIP"
+
+        elif user_tier == "free":
+            # Logged-in free users always get free chain, unlimited
+            tier_chain = TIER_FREE_CHAIN
+            chain_label = "FREE"
+
+        else:  # guest
+            if prompt_count == 0:
+                # Prompt 1 → Best models, hook the user
+                tier_chain = TIER_VIP_CHAIN
+                chain_label = "VIP"
+            elif prompt_count == 1:
+                # Prompt 2 → Good but not best
+                tier_chain = TIER_STANDARD_CHAIN
+                chain_label = "STANDARD"
+            elif prompt_count == 2:
+                # Prompt 3 → Free tier only
+                tier_chain = TIER_FREE_CHAIN
+                chain_label = "FREE"
+            else:
+                # Prompt 4+ → Block, require login
                 yield {
-                    "error": "FreeLimitReached",
-                    "message": "Bạn đã sử dụng hết 100 lượt miễn phí. Vui lòng đăng nhập để tiếp tục."
+                    "error": "NeedLogin",
+                    "message": "Bạn đã dùng hết 3 lượt thử miễn phí. Đăng nhập để tiếp tục.",
+                    "prompt_count": prompt_count,
                 }
                 return
+
+        if user_id:
             self.state_store.increment_user_prompt(user_id)
 
-        # Resolve task tier → provider chain
+        logger.info(f"Tier routing — user_tier={user_tier}, guest_prompt={prompt_count}, chain={chain_label}: {tier_chain}")
+
+        # Resolve task override within tier: task-specific tier tiers still apply, but filtered to tier_chain
         resolved_task = task or "general"
-        chain = settings.task_tiers.get(resolved_task, settings.provider_chain)
+        task_chain = settings.task_tiers.get(resolved_task, settings.provider_chain)
+        # Intersection: keep task_chain order but only providers in tier_chain, then append remaining tier_chain
+        ordered_keys = [k for k in task_chain if k in tier_chain] + [k for k in tier_chain if k not in task_chain]
+        chain = ordered_keys if ordered_keys else tier_chain
 
         providers = self._get_ordered_providers(chain, resolved_task)
 
