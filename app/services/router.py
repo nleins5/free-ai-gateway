@@ -446,17 +446,18 @@ class RouterService:
         max_tokens: Optional[int] = None,
         task: Optional[str] = "general",
         user_tier: Optional[str] = "guest",  # "guest" | "free" | "vip"
+        guest_prompt_count: Optional[int] = None,  # client-tracked count — survives backend restarts
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Streaming version of chat_with_failover.
 
-        Yields SSE-formatted events for real-time response streaming.
-        Includes failover notification when switching providers.
-
         Tier system:
         - guest:  prompt 1 → VIP chain, prompt 2 → standard chain, prompt 3 → free chain, prompt 4+ → NeedLogin
-        - free:   always free chain (cloudflare, openrouter, huggingface…) — unlimited
-        - vip:    always VIP chain (deepinfra, novita, groq…) — unlimited
+        - free:   always free chain (unlimited)
+        - vip:    always VIP chain (unlimited)
+
+        NOTE: For guests, uses client-sent `guest_prompt_count` (localStorage)
+        rather than server-side StateStore, so the funnel survives Render cold starts.
         """
         from app.config import TIER_VIP_CHAIN, TIER_STANDARD_CHAIN, TIER_FREE_CHAIN
 
@@ -489,7 +490,15 @@ class RouterService:
             return
 
         # ── Tier-based routing ──────────────────────────────────────────────
-        prompt_count = self.state_store.get_user_prompts(user_id) if user_id else 0
+        # For guests: use client-sent count (localStorage-based) — survives backend cold starts.
+        # For logged-in users: use StateStore (server-side) — more accurate.
+        if user_tier == "guest":
+            # Trust client count — they track it in localStorage
+            count = guest_prompt_count if guest_prompt_count is not None else (
+                self.state_store.get_user_prompts(user_id) if user_id else 0
+            )
+        else:
+            count = 0  # irrelevant for non-guest tiers
 
         if user_tier == "vip":
             # VIP users always get the best chain, unlimited
@@ -502,15 +511,15 @@ class RouterService:
             chain_label = "FREE"
 
         else:  # guest
-            if prompt_count == 0:
+            if count == 0:
                 # Prompt 1 → Best models, hook the user
                 tier_chain = TIER_VIP_CHAIN
                 chain_label = "VIP"
-            elif prompt_count == 1:
+            elif count == 1:
                 # Prompt 2 → Good but not best
                 tier_chain = TIER_STANDARD_CHAIN
                 chain_label = "STANDARD"
-            elif prompt_count == 2:
+            elif count == 2:
                 # Prompt 3 → Free tier only
                 tier_chain = TIER_FREE_CHAIN
                 chain_label = "FREE"
@@ -519,14 +528,14 @@ class RouterService:
                 yield {
                     "error": "NeedLogin",
                     "message": "Bạn đã dùng hết 3 lượt thử miễn phí. Đăng nhập để tiếp tục.",
-                    "prompt_count": prompt_count,
+                    "prompt_count": count,
                 }
                 return
 
         if user_id:
             self.state_store.increment_user_prompt(user_id)
 
-        logger.info(f"Tier routing — user_tier={user_tier}, guest_prompt={prompt_count}, chain={chain_label}: {tier_chain}")
+        logger.info(f"Tier routing — tier={user_tier}, count={count}, chain={chain_label}: {tier_chain}")
 
         # Resolve task override within tier: task-specific tier tiers still apply, but filtered to tier_chain
         resolved_task = task or "general"

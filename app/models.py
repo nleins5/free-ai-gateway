@@ -60,4 +60,5 @@ class UnifiedAIChatRequest(BaseModel):
     use_rag: Optional[bool] = False
     user_id: Optional[str] = None
     user_tier: Optional[str] = "guest"  # "guest" | "free" | "vip"
+    guest_prompt_count: Optional[int] = 0  # client-side count, used for tier routing (survives backend restarts)
     history: Optional[List[Message]] = []

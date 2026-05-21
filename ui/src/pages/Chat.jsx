@@ -325,6 +325,7 @@ const Chat = () => {
                 task: mode,
                 use_rag: mode === 'research',
                 user_tier: isLoggedIn ? (userPlan === 'vip' ? 'vip' : 'free') : 'guest',
+                guest_prompt_count: promptCount,  // client tracks this — survives backend cold starts
                 history
             });
 

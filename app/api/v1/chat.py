@@ -276,6 +276,7 @@ async def unified_chat_stream(
                 model_override=req.model_override,
                 task=req.task,
                 user_tier=req.user_tier or "guest",
+                guest_prompt_count=req.guest_prompt_count or 0,
             ):
                 # Error from router
                 if "error" in chunk:
