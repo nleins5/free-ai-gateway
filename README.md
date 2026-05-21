@@ -90,6 +90,11 @@ graph TB
 
 Every request follows the same lifecycle: task detection, provider selection via EWMA-weighted scoring, automatic failover on failure, and metadata-enriched response.
 
+![Request Routing Flow](./gateway_routing_flow.png)
+
+<details>
+<summary>🔍 View Mermaid Sequence Diagram Code</summary>
+
 ```mermaid
 sequenceDiagram
     participant C as Client
@@ -118,6 +123,8 @@ sequenceDiagram
     G->>DB: Log tokens_in, tokens_out, cost, latency, status
     G-->>C: Response + headers (x-ai-provider, x-ai-model)
 ```
+</details>
+
 
 ### EWMA Routing Formula
 
