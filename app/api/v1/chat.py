@@ -128,7 +128,7 @@ async def unified_chat(
             try:
                 from ddgs import DDGS
                 with DDGS() as ddgs:
-                    return ddgs.text(q, max_results=3)
+                    return ddgs.text(q, max_results=5)
             except Exception as e:
                 import logging
                 logging.error(f"Web search failed: {e}")
@@ -237,7 +237,7 @@ async def unified_chat_stream(
             try:
                 from ddgs import DDGS
                 with DDGS() as ddgs:
-                    return ddgs.text(q, max_results=3)
+                    return ddgs.text(q, max_results=5)
             except Exception as e:
                 import logging
                 logging.error(f"Web search failed: {e}")
