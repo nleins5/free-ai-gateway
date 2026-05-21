@@ -234,6 +234,11 @@ const Chat = () => {
                     body: JSON.stringify({ prompt: input })
                 });
             } else {
+                // Build conversation history from previous messages (exclude images)
+                const history = messages
+                    .filter(m => !m.isImage && m.content)
+                    .map(m => ({ role: m.role, content: m.content }));
+                
                 res = await fetch(`${API_BASE}/v1/chat/unified`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -241,7 +246,8 @@ const Chat = () => {
                         query: input,
                         user_id: userId,
                         task: mode,
-                        use_rag: mode === 'research'
+                        use_rag: mode === 'research',
+                        history: history
                     })
                 });
             }
@@ -262,9 +268,12 @@ const Chat = () => {
                 localStorage.setItem('prompt_count', newCount.toString());
                 
                 if (mode === 'image') {
+                    // Handle both url and b64_json formats
+                    const imgData = data.data[0];
+                    const imgSrc = imgData.url || (imgData.b64_json ? `data:image/png;base64,${imgData.b64_json}` : '');
                     setMessages(prev => [...prev, {
                         role: 'assistant',
-                        content: data.data[0].url,
+                        content: imgSrc,
                         isImage: true,
                         provider: data.provider || 'AI Image Generator',
                         latency: 1500

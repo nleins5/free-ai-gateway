@@ -81,19 +81,19 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
 # These are loaded from providers.json and updated via reload_config()
 _DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes,ninerouter,doubleword").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "mistral", "deepinfra", "novita", "ninerouter", "doubleword"],
-    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "zhipu", "deepinfra", "novita", "ninerouter", "doubleword"],
-    "research": ["github", "gemini", "claude", "xai", "nvidia", "perplexity", "deepseek", "chutes", "ninerouter", "doubleword"],
-    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "deepseek", "anthropic", "deepinfra", "novita", "chutes", "ninerouter", "doubleword"],
+    "general": ["groq", "gemini", "cloudflare", "github", "openrouter", "together", "huggingface", "doubleword", "nvidia", "ninerouter"],
+    "chat": ["groq", "gemini", "cloudflare", "github", "openrouter", "together", "huggingface", "doubleword", "nvidia", "ninerouter"],
+    "research": ["doubleword", "openrouter", "together", "nvidia", "ninerouter", "cloudflare"],
+    "code": ["doubleword", "openrouter", "together", "nvidia", "cloudflare", "ninerouter"],
     "vision": ["github", "gemini", "anthropic"],
     "image": ["cloudflare", "huggingface", "freetheai"],
     "gemma": ["groq", "openrouter", "huggingface"],
-    "omniverse": ["nvidia", "nvidia_77", "nvidia_custom", "groq", "deepinfra"],
-    "interview": ["groq", "gemini", "github", "deepseek", "mistral", "deepinfra", "novita"],
-    "english": ["groq", "gemini", "github", "deepseek", "mistral", "deepinfra", "novita"],
-    "fast": ["groq", "cerebras", "sambanova", "deepseek", "mistral", "novita"],
-    "cheap": ["github", "freetheai", "cloudflare", "huggingface", "zhipu"],
-    "smart": ["claude", "gemini", "deepseek-r1", "grok", "chutes", "ninerouter", "doubleword"]
+    "omniverse": ["nvidia", "nvidia_custom", "openrouter", "doubleword"],
+    "interview": ["cloudflare", "openrouter", "together", "doubleword", "nvidia"],
+    "english": ["cloudflare", "openrouter", "together", "doubleword", "nvidia"],
+    "fast": ["cloudflare", "openrouter", "together", "doubleword"],
+    "cheap": ["cloudflare", "openrouter", "freetheai", "huggingface"],
+    "smart": ["doubleword", "ninerouter", "openrouter", "together", "nvidia"]
 }
 
 class Settings:

@@ -79,7 +79,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
     "huggingface": Provider(
         key="huggingface",
         name="HuggingFace",
-        base_url="https://api-inference.huggingface.co/v1/",
+        base_url="https://router.huggingface.co/v1",
         api_key_env="HUGGINGFACE_API_KEY",
         model_env="HUGGINGFACE_MODEL",
         default_model="Qwen/Qwen2.5-72B-Instruct",

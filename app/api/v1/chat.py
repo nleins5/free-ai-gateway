@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
+import re
 
 from app.models import ChatRequest, UnifiedAIChatRequest
 from app.dependencies import get_router_service, get_rag_service
@@ -162,7 +163,9 @@ async def unified_chat(
         task=req.task
     )
 
-    answer = response.choices[0].message.content
+    raw_answer = response.choices[0].message.content or ""
+    # Strip DeepSeek-R1 <think>...</think> reasoning blocks
+    answer = re.sub(r'<think>[\s\S]*?</think>\s*', '', raw_answer).strip() or raw_answer
     usage = response.usage
 
     # 3. Log to database

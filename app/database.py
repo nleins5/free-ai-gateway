@@ -31,6 +31,11 @@ def _build_engine():
     ssl_context.check_hostname = False
     ssl_context.verify_mode = _ssl.CERT_NONE
 
+    connect_args = {}
+    # Only use SSL for non-local database connections (e.g. Neon, Supabase)
+    if "localhost" not in clean_url and "127.0.0.1" not in clean_url:
+        connect_args["ssl"] = ssl_context
+
     return create_async_engine(
         clean_url,
         echo=False,
@@ -39,7 +44,7 @@ def _build_engine():
         max_overflow=10,          # Extra connections under load
         pool_recycle=1800,        # Recycle connections every 30min (prevents Neon/Supabase idle timeouts)
         pool_timeout=10,          # Wait max 10s for a connection from pool
-        connect_args={"ssl": ssl_context},
+        connect_args=connect_args,
     )
 
 

@@ -207,6 +207,17 @@ class RouterService:
             if not available:
                 return []
 
+        # Bypass health-based/randomized sorting for specialized tasks to preserve designer's priority order.
+        if task and task not in ("general", "chat"):
+            ordered = []
+            for key in active_keys:
+                for p in available:
+                    if p.key == key:
+                        ordered.append(p)
+                        break
+            logger.info(f"Specialized task '{task}' routing (strictly respecting tier order): {[p.key for p in ordered]}")
+            return ordered
+
         if ROUTING_MODE == "weighted":
             # Score-based selection with some randomness for load distribution
             scored = [(self._calculate_provider_score(p), p) for p in available]
@@ -267,7 +278,16 @@ class RouterService:
         if task == "omniverse":
             sys_msg = {
                 "role": "system",
-                "content": "You are an expert NVIDIA Omniverse and OpenUSD developer. Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, and assist with 3D scene creation using Omniverse Kit. Always provide clean, functional Python code when requested."
+                "content": (
+                    "You are an expert NVIDIA Omniverse, OpenUSD, and 3D web graphics developer. "
+                    "Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, and assist with 3D scene creation. "
+                    "CRITICAL: If the user asks to generate, draw, render, create, or visualize a 3D scene, 3D image, or 3D model (e.g., 'tạo ảnh 3d', 'tạo mô hình 3d', 'render 3d', 'vẽ 3d'), "
+                    "you MUST generate a fully-functional, visually stunning, interactive 3D scene using HTML, CSS, and Three.js inside a single ```html ... ``` block. "
+                    "Always load Three.js and OrbitControls from CDNs (e.g., https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js and https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js). "
+                    "Design the 3D scene to look highly premium, cinematic, and modern (with dark background, futuristic lighting, glowing materials, realistic shadows, and smooth orbital rotation). "
+                    "Ensure OrbitControls is configured so the user can interactively rotate, zoom, and pan around the object. "
+                    "Along with the ```html block, explain your design and provide the equivalent NVIDIA Omniverse OpenUSD Python script so the user gets both the interactive web preview and the Omniverse production code."
+                )
             }
             if messages and messages[0].get("role") == "system":
                 messages[0]["content"] += "\n" + sys_msg["content"]
@@ -436,7 +456,16 @@ class RouterService:
         if task == "omniverse":
             sys_msg = {
                 "role": "system",
-                "content": "You are an expert NVIDIA Omniverse and OpenUSD developer. Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, and assist with 3D scene creation using Omniverse Kit. Always provide clean, functional Python code when requested."
+                "content": (
+                    "You are an expert NVIDIA Omniverse, OpenUSD, and 3D web graphics developer. "
+                    "Your task is to generate OpenUSD Python code, answer Omniverse knowledge questions, and assist with 3D scene creation. "
+                    "CRITICAL: If the user asks to generate, draw, render, create, or visualize a 3D scene, 3D image, or 3D model (e.g., 'tạo ảnh 3d', 'tạo mô hình 3d', 'render 3d', 'vẽ 3d'), "
+                    "you MUST generate a fully-functional, visually stunning, interactive 3D scene using HTML, CSS, and Three.js inside a single ```html ... ``` block. "
+                    "Always load Three.js and OrbitControls from CDNs (e.g., https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js and https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js). "
+                    "Design the 3D scene to look highly premium, cinematic, and modern (with dark background, futuristic lighting, glowing materials, realistic shadows, and smooth orbital rotation). "
+                    "Ensure OrbitControls is configured so the user can interactively rotate, zoom, and pan around the object. "
+                    "Along with the ```html block, explain your design and provide the equivalent NVIDIA Omniverse OpenUSD Python script so the user gets both the interactive web preview and the Omniverse production code."
+                )
             }
             if messages and messages[0].get("role") == "system":
                 messages[0]["content"] += "\n" + sys_msg["content"]
