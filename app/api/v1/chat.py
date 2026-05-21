@@ -1,8 +1,10 @@
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from fastapi import APIRouter, Depends, Header
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 import re
+import json as json_lib
 
 from app.models import ChatRequest, UnifiedAIChatRequest
 from app.dependencies import get_router_service, get_rag_service
@@ -213,3 +215,95 @@ async def unified_chat(
         "metadata": meta,
         "usage": usage.model_dump() if usage else None
     }
+
+
+@router.post("/unified/stream")
+async def unified_chat_stream(
+    req: UnifiedAIChatRequest,
+    router_svc: RouterService = Depends(get_router_service),
+    rag_svc: RAGService = Depends(get_rag_service),
+    x_api_key: str = Header(None, alias="X-API-Key"),
+):
+    """
+    SSE streaming version of unified_chat.
+    Streams tokens to the client in real-time — no waiting for full response.
+    """
+    # Build messages (same logic as unified_chat)
+    messages = []
+
+    if req.use_rag:
+        def perform_web_search(q):
+            try:
+                from ddgs import DDGS
+                with DDGS() as ddgs:
+                    return ddgs.text(q, max_results=3)
+            except Exception as e:
+                import logging
+                logging.error(f"Web search failed: {e}")
+                return []
+
+        search_results = await run_in_threadpool(perform_web_search, req.query)
+        if search_results:
+            context_str = ""
+            for idx, res in enumerate(search_results):
+                context_str += f"[{idx+1}] {res.get('title')}\nURL: {res.get('href')}\nSnippet: {res.get('body')}\n\n"
+            system_prompt = req.system_prompt or "You are a helpful research assistant. Use the following web search results to answer the user's question accurately. Always cite your sources using the [Number] format in your response."
+            messages.append({"role": "system", "content": f"{system_prompt}\n\n--- Web Search Results ---\n{context_str}"})
+        else:
+            system_prompt = req.system_prompt or "You are a helpful assistant."
+            messages.append({"role": "system", "content": system_prompt})
+    else:
+        system_prompt = req.system_prompt or get_task_system_prompt(req.task)
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+    if req.history:
+        for msg in req.history:
+            messages.append({"role": msg.role, "content": msg.content})
+
+    messages.append({"role": "user", "content": req.query})
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            async for chunk in router_svc.chat_stream_with_failover(
+                messages=messages,
+                user_id=req.user_id,
+                model_override=req.model_override,
+                task=req.task,
+            ):
+                # Error from router
+                if "error" in chunk:
+                    yield f"data: {json_lib.dumps({'error': chunk['error'], 'message': chunk.get('message', '')})}\n\n"
+                    return
+
+                # Failover info notification
+                if "info" in chunk:
+                    yield f"data: {json_lib.dumps({'info': chunk['info'], 'message': chunk.get('message', '')})}\n\n"
+                    continue
+
+                # Token chunk
+                choices = chunk.get("choices", [])
+                if choices:
+                    delta = getattr(choices[0], "delta", None)
+                    content = getattr(delta, "content", None) if delta else None
+                    finish_reason = getattr(choices[0], "finish_reason", None)
+
+                    if content:
+                        yield f"data: {json_lib.dumps({'token': content, 'provider': chunk.get('provider', '')})}\n\n"
+                    if finish_reason == "stop":
+                        yield f"data: {json_lib.dumps({'done': True, 'provider': chunk.get('provider', ''), 'model': chunk.get('model', '')})}\n\n"
+                        return
+
+        except Exception as exc:
+            import logging
+            logging.error(f"Stream error: {exc}")
+            yield f"data: {json_lib.dumps({'error': 'StreamError', 'message': str(exc)[:200]})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )

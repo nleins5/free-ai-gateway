@@ -199,6 +199,9 @@ const Chat = () => {
         if (count >= 10) {
             setCurrentTier('general');
         }
+
+        // Warmup ping — wakes up Render before user sends first message
+        fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
     }, []);
 
     const scrollToBottom = () => {
@@ -249,147 +252,165 @@ const Chat = () => {
 
         const userMsg = { role: 'user', content: input };
         setMessages(prev => [...prev, userMsg]);
+        const currentInput = input;
         setInput('');
         setIsLoading(true);
-        
+
+        const gatewayKey = import.meta.env.VITE_GATEWAY_SECRET || '';
+        const standardHeaders = { 'Content-Type': 'application/json' };
+        if (gatewayKey) standardHeaders['X-Gateway-Key'] = gatewayKey;
+
         try {
-            let res;
-            const gatewayKey = import.meta.env.VITE_GATEWAY_SECRET || '';
-            const standardHeaders = { 'Content-Type': 'application/json' };
-            if (gatewayKey) {
-                standardHeaders['X-Gateway-Key'] = gatewayKey;
-            }
-
+            // ── Image mode: regular fetch (no streaming) ──────────────
             if (mode === 'image') {
-                res = await fetchWithRetry(`${API_BASE}/v1/images/generations`, {
+                const res = await fetchWithRetry(`${API_BASE}/v1/images/generations`, {
                     method: 'POST',
                     headers: standardHeaders,
-                    body: JSON.stringify({ prompt: input })
-                }, 1, 45000); // Image generation can take longer
-            } else {
-                // Build conversation history from previous messages (exclude images)
-                const history = messages
-                    .filter(m => !m.isImage && m.content)
-                    .map(m => ({ role: m.role, content: m.content }));
-                
-                res = await fetchWithRetry(`${API_BASE}/v1/chat/unified`, {
-                    method: 'POST',
-                    headers: standardHeaders,
-                    body: JSON.stringify({
-                        query: input,
-                        user_id: userId,
-                        task: mode,
-                        use_rag: mode === 'research',
-                        history: history
-                    })
-                }, 2, 30000);
-            }
+                    body: JSON.stringify({ prompt: currentInput })
+                }, 1, 60000);
 
-            // 402 = Free tier exhausted → force login
-            if (res.status === 402) {
-                setMessages(prev => prev.slice(0, -1)); // Remove unanswered user msg
-                setShowModal(true);
-                setIsLoading(false);
-                return;
-            }
-
-            // 403 = Gateway secret mismatch
-            if (res.status === 403) {
-                setMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `⚠️ Lỗi xác thực (403 Forbidden). Gateway key không khớp — liên hệ admin để được cấp quyền.`,
-                    provider: 'System',
-                    latency: 0
-                }]);
-                setToast('403 Forbidden: Gateway key không hợp lệ');
-                return;
-            }
-
-            if (res.ok) {
-                const data = await res.json();
-                
-                const newCount = promptCount + 1;
-                setPromptCount(newCount);
-                localStorage.setItem('prompt_count', newCount.toString());
-                
-                if (mode === 'image') {
-                    // Handle both url and b64_json formats
-                    const imgData = data.data[0];
-                    const imgSrc = imgData.url || (imgData.b64_json ? `data:image/png;base64,${imgData.b64_json}` : '');
-                    setMessages(prev => [...prev, {
-                        role: 'assistant',
-                        content: imgSrc,
-                        isImage: true,
-                        provider: data.provider || 'AI Image Generator',
-                        latency: 1500
-                    }]);
-                } else {
-                    setMessages(prev => [...prev, {
-                        role: 'assistant',
-                        content: data.answer,
-                        provider: data.metadata?.provider_name || data.metadata?.provider || 'AI Gateway',
-                        latency: data.metadata?.latency_ms ? Math.round(data.metadata.latency_ms) : null
-                    }]);
-                    
-                    if (data.metadata?.failover_trace && data.metadata.failover_trace.length > 0) {
-                        setToast(`Failover Active: ${data.metadata.failover_trace.length} provider(s) failed. Routed to ${data.metadata.provider_name}.`);
-                    }
-                }
-            } else {
-                // Double-check for 402 (safety net for cached JS)
-                if (res.status === 402) {
-                    setMessages(prev => prev.slice(0, -1));
-                    setShowModal(true);
+                if (res.status === 402) { setMessages(prev => prev.slice(0, -1)); setShowModal(true); return; }
+                if (!res.ok) {
+                    let msg = `Server Error ${res.status}`;
+                    try { const e = await res.json(); msg = e.detail || e.error || msg; } catch {}
+                    setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${msg}`, provider: 'System', latency: 0 }]);
                     return;
                 }
-                
-                // Parse error detail - could be JSON object or string
-                let errorMsg = `Server Error ${res.status}`;
-                try {
-                    const err = await res.json();
-                    if (typeof err.detail === 'string') {
-                        errorMsg = err.detail;
-                    } else if (err.detail?.message) {
-                        errorMsg = err.detail.message;
-                    } else if (err.error) {
-                        errorMsg = err.error;
+                const data = await res.json();
+                const imgData = data.data[0];
+                const imgSrc = imgData.url || (imgData.b64_json ? `data:image/png;base64,${imgData.b64_json}` : '');
+                setMessages(prev => [...prev, { role: 'assistant', content: imgSrc, isImage: true, provider: data.provider || 'AI Image Generator', latency: 1500 }]);
+                return;
+            }
+
+            // ── Chat/Code/Omniverse/Research: SSE Streaming ───────────
+            const history = messages
+                .filter(m => !m.isImage && m.content)
+                .map(m => ({ role: m.role, content: m.content }));
+
+            const body = JSON.stringify({
+                query: currentInput,
+                user_id: userId,
+                task: mode,
+                use_rag: mode === 'research',
+                history
+            });
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+            const res = await fetch(`${API_BASE}/v1/chat/unified/stream`, {
+                method: 'POST',
+                headers: standardHeaders,
+                body,
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (res.status === 402) { setMessages(prev => prev.slice(0, -1)); setShowModal(true); return; }
+            if (res.status === 403) {
+                setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Lỗi xác thực (403). Liên hệ admin.', provider: 'System', latency: 0 }]);
+                return;
+            }
+            if (!res.ok) {
+                let msg = `Server Error ${res.status}`;
+                try { const e = await res.json(); msg = e.detail || e.error || msg; } catch {}
+                setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${msg}`, provider: 'System', latency: 0 }]);
+                return;
+            }
+
+            // Create streaming message placeholder
+            const streamingId = Date.now();
+            setMessages(prev => [...prev, { role: 'assistant', content: '', provider: '', latency: null, _streamingId: streamingId }]);
+
+            // Read SSE stream
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullContent = '';
+            let finalProvider = '';
+            const startTime = Date.now();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const raw = line.slice(6).trim();
+                    if (!raw) continue;
+
+                    let parsed;
+                    try { parsed = JSON.parse(raw); } catch { continue; }
+
+                    if (parsed.error) {
+                        const errMsg = parsed.error === 'FreeLimitReached'
+                            ? null  // handled by 402 above
+                            : `⚠️ ${parsed.message || parsed.error}`;
+                        if (errMsg) {
+                            setMessages(prev => prev.map(m =>
+                                m._streamingId === streamingId
+                                    ? { ...m, content: errMsg, provider: 'System' }
+                                    : m
+                            ));
+                        }
+                        break;
                     }
-                } catch {
-                    errorMsg = res.statusText || errorMsg;
+
+                    if (parsed.info) {
+                        setToast(parsed.message);
+                        continue;
+                    }
+
+                    if (parsed.token) {
+                        fullContent += parsed.token;
+                        if (parsed.provider) finalProvider = parsed.provider;
+                        setMessages(prev => prev.map(m =>
+                            m._streamingId === streamingId
+                                ? { ...m, content: fullContent, provider: parsed.provider || m.provider }
+                                : m
+                        ));
+                    }
+
+                    if (parsed.done) {
+                        finalProvider = parsed.provider || finalProvider;
+                        const latencyMs = Date.now() - startTime;
+                        setMessages(prev => prev.map(m =>
+                            m._streamingId === streamingId
+                                ? { ...m, content: fullContent, provider: finalProvider, latency: latencyMs, _streamingId: undefined }
+                                : m
+                        ));
+
+                        const newCount = promptCount + 1;
+                        setPromptCount(newCount);
+                        localStorage.setItem('prompt_count', newCount.toString());
+                        break;
+                    }
                 }
-                
-                setMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `⚠️ ${errorMsg}`,
-                    provider: 'System',
-                    latency: 0
-                }]);
-                setToast(errorMsg);
             }
+
         } catch (error) {
-            const isTimeout = error.message?.includes('timed out') || error.name === 'AbortError';
-            const isColdStart = error.message?.includes('Load failed') || error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError');
-            
-            let userMessage;
-            if (isTimeout) {
-                userMessage = '⏱️ Backend đang khởi động (cold start). Vui lòng thử lại sau 30 giây.';
-            } else if (isColdStart) {
-                userMessage = '🔌 Không kết nối được server. Backend có thể đang ngủ — thử lại sau 30 giây. Nếu vẫn lỗi, kiểm tra Render dashboard.';
-            } else {
-                userMessage = `⚠️ Lỗi kết nối: ${error.message}`;
-            }
-            
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: userMessage,
-                provider: 'System',
-                latency: 0
-            }]);
+            const isColdStart = error.message?.includes('Load failed') || error.message?.includes('Failed to fetch') || error.name === 'AbortError';
+            const msg = isColdStart
+                ? '🔌 Không kết nối được server. Backend có thể đang ngủ — thử lại sau 30 giây.'
+                : `⚠️ Lỗi kết nối: ${error.message}`;
+            // Replace streaming placeholder if exists, else add new msg
+            setMessages(prev => {
+                const hasStreaming = prev.some(m => m._streamingId);
+                if (hasStreaming) return prev.map(m => m._streamingId ? { ...m, content: msg, provider: 'System', latency: 0, _streamingId: undefined } : m);
+                return [...prev, { role: 'assistant', content: msg, provider: 'System', latency: 0 }];
+            });
             setToast(error.message);
         } finally {
             setIsLoading(false);
         }
     };
+
 
     const startRecording = async () => {
         try {
