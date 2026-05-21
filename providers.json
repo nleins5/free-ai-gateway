@@ -42,7 +42,8 @@
     "deepinfra",
     "novita",
     "chutes",
-    "ninerouter"
+    "ninerouter",
+    "doubleword"
   ],
   "task_tiers": {
     "general": [
@@ -57,7 +58,8 @@
       "mistral",
       "deepinfra",
       "novita",
-      "ninerouter"
+      "ninerouter",
+      "doubleword"
     ],
     "chat": [
       "groq",
@@ -71,7 +73,8 @@
       "zhipu",
       "deepinfra",
       "novita",
-      "ninerouter"
+      "ninerouter",
+      "doubleword"
     ],
     "research": [
       "gemini",
@@ -84,7 +87,8 @@
       "perplexity",
       "deepseek",
       "chutes",
-      "ninerouter"
+      "ninerouter",
+      "doubleword"
     ],
     "chat_faq": [
       "groq",
@@ -133,7 +137,8 @@
       "deepinfra",
       "novita",
       "chutes",
-      "ninerouter"
+      "ninerouter",
+      "doubleword"
     ],
     "reasoning": [
       "groq",
@@ -148,7 +153,8 @@
       "nvidia_custom",
       "deepseek",
       "o1",
-      "chutes"
+      "chutes",
+      "doubleword"
     ],
     "rag": [
       "groq",
@@ -223,7 +229,8 @@
       "deepseek-r1",
       "grok",
       "chutes",
-      "ninerouter"
+      "ninerouter",
+      "doubleword"
     ]
   },
   "provider_weights": {
@@ -268,7 +275,8 @@
     "deepinfra": 2,
     "novita": 2,
     "chutes": 1,
-    "ninerouter": 2
+    "ninerouter": 2,
+    "doubleword": 2
   },
   "budget": {
     "daily_limit_usd": 0,

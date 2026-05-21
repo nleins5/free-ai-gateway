@@ -358,4 +358,12 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         model_env="NINEROUTER_MODEL",
         default_model="claude-3-5-sonnet-20241022",
     ),
+    "doubleword": Provider(
+        key="doubleword",
+        name="Doubleword AI",
+        base_url="https://api.doubleword.ai/v1",
+        api_key_env="DOUBLEWORD_API_KEY",
+        model_env="DOUBLEWORD_MODEL",
+        default_model="moonshotai/Kimi-K2.6",
+    ),
 }

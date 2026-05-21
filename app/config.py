@@ -73,16 +73,18 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
     "deepinfra": (0.0, 0.0),
     "novita": (0.0, 0.0),
     "chutes": (0.0, 0.0),
+    "ninerouter": (0.0, 0.0),
+    "doubleword": (0.0, 0.0),
 }
 
 # --- DYNAMIC STATE ---
 # These are loaded from providers.json and updated via reload_config()
-_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes,ninerouter").split(",") if s.strip()]
+_DEFAULT_CHAIN = [s.strip().lower() for s in os.getenv("PROVIDER_CHAIN", "groq,gemini,github,cerebras,huggingface,sambanova,cloudflare,openrouter,freetheai,deepseek,mistral,zhipu,deepinfra,novita,chutes,ninerouter,doubleword").split(",") if s.strip()]
 _DEFAULT_TASK_TIERS = {
-    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "mistral", "deepinfra", "novita", "ninerouter"],
-    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "zhipu", "deepinfra", "novita", "ninerouter"],
-    "research": ["github", "gemini", "claude", "xai", "nvidia", "perplexity", "deepseek", "chutes", "ninerouter"],
-    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "deepseek", "anthropic", "deepinfra", "novita", "chutes", "ninerouter"],
+    "general": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "mistral", "deepinfra", "novita", "ninerouter", "doubleword"],
+    "chat": ["groq", "gemini", "github", "huggingface", "cloudflare", "nvidia", "nvidia_77", "deepseek", "zhipu", "deepinfra", "novita", "ninerouter", "doubleword"],
+    "research": ["github", "gemini", "claude", "xai", "nvidia", "perplexity", "deepseek", "chutes", "ninerouter", "doubleword"],
+    "code": ["github", "huggingface", "cerebras", "groq", "nvidia", "nvidia_77", "deepseek", "anthropic", "deepinfra", "novita", "chutes", "ninerouter", "doubleword"],
     "vision": ["github", "gemini", "anthropic"],
     "image": ["cloudflare", "huggingface", "freetheai"],
     "gemma": ["groq", "openrouter", "huggingface"],
@@ -91,7 +93,7 @@ _DEFAULT_TASK_TIERS = {
     "english": ["groq", "gemini", "github", "deepseek", "mistral", "deepinfra", "novita"],
     "fast": ["groq", "cerebras", "sambanova", "deepseek", "mistral", "novita"],
     "cheap": ["github", "freetheai", "cloudflare", "huggingface", "zhipu"],
-    "smart": ["claude", "gemini", "deepseek-r1", "grok", "chutes", "ninerouter"]
+    "smart": ["claude", "gemini", "deepseek-r1", "grok", "chutes", "ninerouter", "doubleword"]
 }
 
 class Settings:
