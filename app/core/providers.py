@@ -26,7 +26,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         base_url="https://openrouter.ai/api/v1",
         api_key_env="OPENROUTER_API_KEY",
         model_env="OPENROUTER_MODEL",
-        default_model="openrouter/free",
+        default_model="mistralai/mistral-7b-instruct:free",
     ),
     "cloudflare": Provider(
         key="cloudflare",

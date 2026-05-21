@@ -216,6 +216,33 @@ const Chat = () => {
         }
     }, [toast]);
 
+    // Helper: fetch with timeout + retry for Render cold start
+    const fetchWithRetry = async (url, options, maxRetries = 2, timeoutMs = 30000) => {
+        let lastError;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const res = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(timer);
+                return res;
+            } catch (err) {
+                clearTimeout(timer);
+                lastError = err;
+                // Only retry on network/abort errors, not on HTTP errors
+                if (err.name === 'AbortError') {
+                    lastError = new Error('Request timed out — backend có thể đang khởi động. Thử lại...');
+                }
+                if (attempt < maxRetries) {
+                    // Show retry notice
+                    setToast(`Đang kết nối lại (lần ${attempt + 1}/${maxRetries})...`);
+                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+                }
+            }
+        }
+        throw lastError;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!input.trim() || !userId) return;
@@ -234,18 +261,18 @@ const Chat = () => {
             }
 
             if (mode === 'image') {
-                res = await fetch(`${API_BASE}/v1/images/generations`, {
+                res = await fetchWithRetry(`${API_BASE}/v1/images/generations`, {
                     method: 'POST',
                     headers: standardHeaders,
                     body: JSON.stringify({ prompt: input })
-                });
+                }, 1, 45000); // Image generation can take longer
             } else {
                 // Build conversation history from previous messages (exclude images)
                 const history = messages
                     .filter(m => !m.isImage && m.content)
                     .map(m => ({ role: m.role, content: m.content }));
                 
-                res = await fetch(`${API_BASE}/v1/chat/unified`, {
+                res = await fetchWithRetry(`${API_BASE}/v1/chat/unified`, {
                     method: 'POST',
                     headers: standardHeaders,
                     body: JSON.stringify({
@@ -255,7 +282,7 @@ const Chat = () => {
                         use_rag: mode === 'research',
                         history: history
                     })
-                });
+                }, 2, 30000);
             }
 
             // 402 = Free tier exhausted → force login
@@ -263,6 +290,18 @@ const Chat = () => {
                 setMessages(prev => prev.slice(0, -1)); // Remove unanswered user msg
                 setShowModal(true);
                 setIsLoading(false);
+                return;
+            }
+
+            // 403 = Gateway secret mismatch
+            if (res.status === 403) {
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `⚠️ Lỗi xác thực (403 Forbidden). Gateway key không khớp — liên hệ admin để được cấp quyền.`,
+                    provider: 'System',
+                    latency: 0
+                }]);
+                setToast('403 Forbidden: Gateway key không hợp lệ');
                 return;
             }
 
@@ -328,13 +367,25 @@ const Chat = () => {
                 setToast(errorMsg);
             }
         } catch (error) {
+            const isTimeout = error.message?.includes('timed out') || error.name === 'AbortError';
+            const isColdStart = error.message?.includes('Load failed') || error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError');
+            
+            let userMessage;
+            if (isTimeout) {
+                userMessage = '⏱️ Backend đang khởi động (cold start). Vui lòng thử lại sau 30 giây.';
+            } else if (isColdStart) {
+                userMessage = '🔌 Không kết nối được server. Backend có thể đang ngủ — thử lại sau 30 giây. Nếu vẫn lỗi, kiểm tra Render dashboard.';
+            } else {
+                userMessage = `⚠️ Lỗi kết nối: ${error.message}`;
+            }
+            
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `⚠️ Lỗi kết nối: ${error.message}. Hãy kiểm tra server đang chạy.`,
+                content: userMessage,
                 provider: 'System',
                 latency: 0
             }]);
-            setToast(`Lỗi kết nối: ${error.message}`);
+            setToast(error.message);
         } finally {
             setIsLoading(false);
         }

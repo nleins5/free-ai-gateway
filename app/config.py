@@ -88,7 +88,7 @@ _DEFAULT_TASK_TIERS = {
     "vision": ["github", "gemini", "anthropic"],
     "image": ["cloudflare", "huggingface", "freetheai"],
     "gemma": ["groq", "openrouter", "huggingface"],
-    "omniverse": ["nvidia", "nvidia_custom", "openrouter", "doubleword"],
+    "omniverse": ["nvidia", "nvidia_custom", "doubleword", "together", "openrouter", "groq", "gemini", "cloudflare", "github"],
     "interview": ["cloudflare", "openrouter", "together", "doubleword", "nvidia"],
     "english": ["cloudflare", "openrouter", "together", "doubleword", "nvidia"],
     "fast": ["cloudflare", "openrouter", "together", "doubleword"],
