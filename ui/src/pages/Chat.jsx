@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Sparkles, Code2, Image as ImageIcon, Search, Settings, ArrowLeft, Zap, X, Box, Plus, Activity, Brain, Database, Palette, CreditCard, HelpCircle, Pencil, Check } from 'lucide-react';
+import { Send, Mic, Sparkles, Code2, Image as ImageIcon, Search, Settings, ArrowLeft, Zap, X, Box, Plus, Activity, Brain, Database, Palette, CreditCard, HelpCircle, Pencil, Check, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -211,6 +211,37 @@ const Chat = () => {
         if (count === 0) return 'vip';
         if (count === 1) return 'standard';
         return 'free';
+    };
+
+    const currentTier = getUserTier(isLoggedIn, userPlan, promptCount);
+
+    const handleDeleteSession = (id, e) => {
+        e.stopPropagation();
+        
+        const remaining = sessions.filter(s => s.id !== id);
+        
+        if (remaining.length === 0) {
+            const newSession = {
+                id: Date.now(),
+                title: 'New Chat',
+                messages: [defaultMessage]
+            };
+            const updated = [newSession];
+            setSessions(updated);
+            setActiveSessionId(newSession.id);
+            setMessages(newSession.messages);
+            localStorage.setItem('chat_sessions', JSON.stringify(updated));
+        } else {
+            setSessions(remaining);
+            localStorage.setItem('chat_sessions', JSON.stringify(remaining));
+            
+            if (activeSessionId === id) {
+                const nextSession = remaining[0];
+                setActiveSessionId(nextSession.id);
+                setMessages(nextSession.messages);
+            }
+        }
+        setToast('Đã xóa cuộc trò chuyện.');
     };
 
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -708,13 +739,22 @@ const Chat = () => {
                                 ) : (
                                     <>
                                         <span className="truncate flex-1">{s.title}</span>
-                                        <button 
-                                            onClick={(e) => startRename(s.id, s.title, e)}
-                                            className={`p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-graphite hover:text-ghost ${activeSessionId === s.id ? 'opacity-100 text-ghost/60' : ''}`}
-                                            title="Rename chat"
-                                        >
-                                            <Pencil className="w-3 h-3" />
-                                        </button>
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                            <button 
+                                                onClick={(e) => startRename(s.id, s.title, e)}
+                                                className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-graphite hover:text-ghost ${activeSessionId === s.id ? 'opacity-100 text-ghost/60' : ''}`}
+                                                title="Đổi tên"
+                                            >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => handleDeleteSession(s.id, e)}
+                                                className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20 text-red-400/70 hover:text-red-400 ${activeSessionId === s.id ? 'opacity-100' : ''}`}
+                                                title="Xóa"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
                                     </>
                                 )}
                             </div>
