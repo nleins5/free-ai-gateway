@@ -263,44 +263,61 @@ async def get_current_config():
 
 
 @router.post("/providers/add", dependencies=[Depends(verify_admin)])
-async def add_provider(request: Request):
+async def add_provider(request: Request, db: AsyncSession = Depends(get_db)):
     """
-    Dynamically add a new provider to the routing chain at runtime.
-    Does NOT persist across restarts — use environment variables for permanent providers.
+    Dynamically add a new provider and persist it across restarts.
+    Stored in the `custom_providers` DB table — survives Render redeploys.
     """
     import os
+    from app.db_models import CustomProvider
+    from app.core.providers import PROVIDER_REGISTRY, Provider
+
     body = await request.json()
     key = body.get("key", "").strip().lower().replace(" ", "_")
     name = body.get("name", "").strip()
     base_url = body.get("base_url", "").strip()
-    api_key = body.get("api_key", "").strip()
+    api_key_val = body.get("api_key", "").strip()
     default_model = body.get("default_model", "").strip()
     weight = int(body.get("weight", 2))
     tasks = body.get("tasks", [])
 
-    if not all([key, name, base_url, api_key, default_model]):
+    if not all([key, name, base_url, api_key_val, default_model]):
         return {"status": "error", "message": "All fields (key, name, base_url, api_key, default_model) are required."}
 
-    from app.core.providers import PROVIDER_REGISTRY, Provider
+    # Check if already exists in DB
+    from sqlalchemy import select
+    existing = await db.execute(select(CustomProvider).where(CustomProvider.key == key))
+    if existing.scalar_one_or_none():
+        return {"status": "error", "message": f"Provider '{key}' already exists. Delete it first to re-add."}
 
-    if key in PROVIDER_REGISTRY:
-        return {"status": "error", "message": f"Provider '{key}' already exists."}
-
-    # Register the provider in memory
-    api_key_env = f"DYNAMIC_{key.upper()}_API_KEY"
-    os.environ[api_key_env] = api_key  # Inject API key into env
-
-    new_provider = Provider(
+    # Persist to DB
+    cp = CustomProvider(
         key=key,
         name=name,
         base_url=base_url,
-        api_key_env=api_key_env,
-        model_env=f"DYNAMIC_{key.upper()}_MODEL",
+        api_key=api_key_val,
         default_model=default_model,
+        weight=weight,
+        tasks=tasks,
+        is_active=True,
     )
-    PROVIDER_REGISTRY[key] = new_provider
+    db.add(cp)
+    await db.commit()
 
-    # Add to provider chain and task tiers
+    # Also register in-memory so it's usable immediately (no restart needed)
+    env_key = f"CUSTOM_{key.upper()}_API_KEY"
+    os.environ[env_key] = api_key_val
+
+    if key not in PROVIDER_REGISTRY:
+        PROVIDER_REGISTRY[key] = Provider(
+            key=key,
+            name=name,
+            base_url=base_url,
+            api_key_env=env_key,
+            model_env=f"CUSTOM_{key.upper()}_MODEL",
+            default_model=default_model,
+        )
+
     if key not in settings.provider_chain:
         settings.provider_chain.append(key)
     settings.dynamic_weights[key] = weight
@@ -310,40 +327,46 @@ async def add_provider(request: Request):
 
     return {
         "status": "success",
-        "message": f"Provider '{name}' registered successfully and added to routing chain.",
+        "message": f"Provider '{name}' registered and saved to database. It will persist across restarts.",
         "provider": {"key": key, "name": name, "tasks": tasks}
     }
 
 
 @router.delete("/providers/{provider_key}", dependencies=[Depends(verify_admin)])
-async def remove_provider(provider_key: str):
-    """Remove a provider from the active routing chain (in-memory only)."""
-    from app.core.providers import PROVIDER_REGISTRY
+async def remove_provider(provider_key: str, db: AsyncSession = Depends(get_db)):
+    """Remove a custom provider from routing chain and mark as inactive in DB."""
+    from app.db_models import CustomProvider
+    from sqlalchemy import select
 
     # Protect core providers from deletion
-    core_providers = {"groq", "gemini", "github", "cloudflare", "openrouter"}
+    core_providers = {"groq", "gemini", "github", "cloudflare", "openrouter", "nvidia"}
     if provider_key in core_providers:
-        return {"status": "error", "message": f"Cannot remove core provider '{provider_key}'."}
+        return {"status": "error", "message": f"Cannot remove core provider '{provider_key}'. It is built-in."}
 
+    # Soft-delete in DB (mark inactive)
+    result = await db.execute(select(CustomProvider).where(CustomProvider.key == provider_key))
+    cp = result.scalar_one_or_none()
+    if cp:
+        cp.is_active = False
+        await db.commit()
+
+    # Remove from in-memory routing
     removed_from_chain = False
     if provider_key in settings.provider_chain:
         settings.provider_chain.remove(provider_key)
         removed_from_chain = True
 
-    # Remove from task tiers
     for tier_list in settings.task_tiers.values():
         if provider_key in tier_list:
             tier_list.remove(provider_key)
 
-    # Remove from registry (optional — keeps it from being selected)
-    # We keep the registry entry so admin can see it was there
     if provider_key in settings.dynamic_weights:
         del settings.dynamic_weights[provider_key]
 
-    if removed_from_chain:
-        return {"status": "success", "message": f"Provider '{provider_key}' removed from routing chain."}
+    if cp or removed_from_chain:
+        return {"status": "success", "message": f"Provider '{provider_key}' removed from routing chain and deactivated in database."}
     else:
-        return {"status": "error", "message": f"Provider '{provider_key}' not found in routing chain."}
+        return {"status": "error", "message": f"Provider '{provider_key}' not found in chain or database."}
 
 
 @router.post("/providers/{provider_key}/reset", dependencies=[Depends(verify_admin)])

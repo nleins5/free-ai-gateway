@@ -1,6 +1,6 @@
 import uuid
 import datetime
-from sqlalchemy import Column, String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Index
+from sqlalchemy import Column, String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Index, JSON
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -78,3 +78,18 @@ class RequestLog(Base):
     created_at = Column(DateTime(timezone=True), default=_now)
 
     user = relationship("User", back_populates="request_logs")
+
+
+class CustomProvider(Base):
+    """Providers added dynamically via admin panel — persisted across restarts."""
+    __tablename__ = "custom_providers"
+
+    key = Column(String(50), primary_key=True)
+    name = Column(String(100), nullable=False)
+    base_url = Column(String(500), nullable=False)
+    api_key = Column(String(500), nullable=False)   # stored in plain text (treat like env var)
+    default_model = Column(String(200), nullable=False)
+    weight = Column(Integer, default=2)
+    tasks = Column(JSON, default=list)              # list of task tier names
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=_now)

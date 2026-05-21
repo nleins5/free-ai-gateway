@@ -29,6 +29,52 @@ from app.dependencies import verify_gateway
 
 from contextlib import asynccontextmanager
 
+
+async def load_custom_providers_from_db():
+    """Load dynamically-added providers from DB and register them into the routing chain."""
+    try:
+        from app.database import AsyncSessionLocal
+        from app.db_models import CustomProvider
+        from app.core.providers import PROVIDER_REGISTRY, Provider
+        from app.config import settings
+
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import select
+            result = await db.execute(select(CustomProvider).where(CustomProvider.is_active == True))
+            custom_providers = result.scalars().all()
+
+        for cp in custom_providers:
+            if cp.key in PROVIDER_REGISTRY:
+                continue  # Skip if already registered (e.g., after hot-reload)
+
+            # Inject API key into environment
+            env_key = f"CUSTOM_{cp.key.upper()}_API_KEY"
+            os.environ[env_key] = cp.api_key
+
+            PROVIDER_REGISTRY[cp.key] = Provider(
+                key=cp.key,
+                name=cp.name,
+                base_url=cp.base_url,
+                api_key_env=env_key,
+                model_env=f"CUSTOM_{cp.key.upper()}_MODEL",
+                default_model=cp.default_model,
+            )
+
+            if cp.key not in settings.provider_chain:
+                settings.provider_chain.append(cp.key)
+            settings.dynamic_weights[cp.key] = cp.weight
+
+            for task in (cp.tasks or []):
+                if task in settings.task_tiers and cp.key not in settings.task_tiers[task]:
+                    settings.task_tiers[task].append(cp.key)
+
+        if custom_providers:
+            logger.info(f"Loaded {len(custom_providers)} custom provider(s) from DB: {[p.key for p in custom_providers]}")
+
+    except Exception as e:
+        logger.warning(f"Could not load custom providers from DB: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Skip DB initialization in serverless environments
@@ -37,6 +83,9 @@ async def lifespan(app: FastAPI):
     if not is_serverless:
         # Initialize Database only in local/dev
         await init_db()
+
+        # ── Load persisted custom providers from DB ──────────────────
+        await load_custom_providers_from_db()
 
         # Initialize RAG Store and Service (local only)
         rag_store = SimpleRAGStore(RAG_STORE_PATH)
