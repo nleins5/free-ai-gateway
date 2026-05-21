@@ -102,7 +102,7 @@ TIER_VIP_CHAIN = [s.strip() for s in os.getenv("TIER_VIP_CHAIN", "deepinfra,novi
 # STANDARD: prompt 2 — Good quality, reliable
 TIER_STANDARD_CHAIN = [s.strip() for s in os.getenv("TIER_STANDARD_CHAIN", "groq,gemini,cloudflare,github").split(",") if s.strip()]
 # FREE: prompt 3+ (logged in free users) — Always-on free providers
-TIER_FREE_CHAIN = [s.strip() for s in os.getenv("TIER_FREE_CHAIN", "cloudflare,openrouter,huggingface,groq").split(",") if s.strip()]
+TIER_FREE_CHAIN = [s.strip() for s in os.getenv("TIER_FREE_CHAIN", "cloudflare,openrouter,huggingface,groq,transformerrobotics").split(",") if s.strip()]
 
 class Settings:
     """Mutable runtime settings — reloaded from providers.json on demand."""
