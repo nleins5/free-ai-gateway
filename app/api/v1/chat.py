@@ -145,7 +145,10 @@ async def unified_chat(
                 })
             
             try:
-                from ddgs import DDGS
+                try:
+                    from ddgs import DDGS
+                except ImportError:
+                    from duckduckgo_search import DDGS
                 with DDGS() as ddgs:
                     # 1. Tìm kiếm thô sơ theo truy vấn ban đầu
                     results.extend(list(ddgs.text(q, max_results=5)))
@@ -306,7 +309,10 @@ async def unified_chat_stream(
                 })
             
             try:
-                from ddgs import DDGS
+                try:
+                    from ddgs import DDGS
+                except ImportError:
+                    from duckduckgo_search import DDGS
                 with DDGS() as ddgs:
                     # 1. Tìm kiếm thô sơ theo truy vấn ban đầu
                     results.extend(list(ddgs.text(q, max_results=5)))
