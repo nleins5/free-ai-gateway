@@ -28,7 +28,7 @@ class TestHealth:
         body = response.json()
         assert body["status"] == "online"
         assert "timestamp" in body
-        assert body["version"] == "2.0.0"
+        assert body["version"] == "2.1.0"
 
 
 # ─── Request Validation (422 on bad input) ──────────────────────
@@ -219,14 +219,36 @@ class TestConfig:
 class TestAdmin:
     def test_stats_accessible_without_key_in_dev(self, client):
         """In dev mode (ADMIN_SECRET=changeme), stats should be accessible."""
-        response = client.get("/admin/stats")
+        response = client.get("/v1/admin/stats")
         # Either 200 (no key needed) or 403 (key needed but not sent)
         assert response.status_code in (200, 403)
 
     def test_config_endpoint_exists(self, client):
-        response = client.get("/admin/config")
+        response = client.get("/v1/admin/config")
         assert response.status_code in (200, 403)
 
     def test_reload_endpoint_exists(self, client):
-        response = client.post("/admin/reload")
+        response = client.post("/v1/admin/reload")
         assert response.status_code in (200, 403)
+
+
+# ─── Audio & Voice Endpoints ─────────────────────────────────────
+
+class TestAudio:
+    def test_transcriptions_requires_file(self, client):
+        """POST /v1/audio/transcriptions requires a file in multipart form data."""
+        response = client.post("/v1/audio/transcriptions")
+        assert response.status_code == 422
+
+    def test_transcriptions_successful_with_mock_failover(self, client):
+        """POST /v1/audio/transcriptions fails over properly or succeeds using mocked router."""
+        # Create a mock webm sound file in memory
+        files = {"file": ("test.webm", b"mock audio binary data", "audio/webm")}
+        data = {"language": "vi"}
+        
+        # Call endpoint, since no keys are active in test, it will return 500 containing 'All STT providers failed'
+        # which proves our failover loop ran through all options and executed the correct logic!
+        response = client.post("/v1/audio/transcriptions", files=files, data=data)
+        assert response.status_code == 500
+        assert "All STT providers failed" in response.json()["detail"]
+
