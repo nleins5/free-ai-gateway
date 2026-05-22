@@ -1,9 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
-from openai import AsyncOpenAI
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect, Depends
 import os
 import tempfile
 import aiofiles
 from app.config import settings
+from app.dependencies import get_router_service
+from app.services.router import RouterService
+from app.core.providers import PROVIDER_REGISTRY
 
 router = APIRouter()
 
@@ -11,13 +13,8 @@ router = APIRouter()
 async def create_transcription(
     file: UploadFile = File(...),
     language: str = Form("vi"),
+    router_svc: RouterService = Depends(get_router_service),
 ):
-    groq_api_key = settings.groq_api_key
-    if not groq_api_key:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY not set in configuration")
-
-    client = AsyncOpenAI(api_key=groq_api_key, base_url="https://api.groq.com/openai/v1")
-
     # Using tempfile and aiofiles to avoid blocking the event loop
     temp_path = None
     try:
@@ -38,22 +35,45 @@ async def create_transcription(
             else "Đây là câu nói tiếng Việt."
         )
 
-        with open(temp_path, "rb") as audio_file:
-            transcription = await client.audio.transcriptions.create(
-                file=audio_file,
-                model="whisper-large-v3",
-                language=normalized_language,
-                temperature=0.0,
-                prompt=transcription_prompt,
-                response_format="json"
-            )
+        audio_chain = ["groq", "openai"]
+        success = False
+        last_error = None
+        text = ""
 
-        text = transcription.text.strip()
+        for provider_key in audio_chain:
+            provider = PROVIDER_REGISTRY.get(provider_key)
+            if not provider or not router_svc._has_api_key(provider):
+                continue
+
+            model = "whisper-large-v3" if provider_key == "groq" else "whisper-1"
+            try:
+                client = router_svc.get_client(provider)
+                with open(temp_path, "rb") as audio_file:
+                    transcription = await client.audio.transcriptions.create(
+                        file=audio_file,
+                        model=model,
+                        language=normalized_language,
+                        temperature=0.0,
+                        prompt=transcription_prompt,
+                        response_format="json"
+                    )
+                text = transcription.text.strip()
+                success = True
+                break
+            except Exception as e:
+                last_error = str(e)
+                continue
+
+        if not success:
+            raise HTTPException(status_code=500, detail=f"All STT providers failed. Last error: {last_error}")
+
         # Lọc bỏ các kết quả bịa đặt thường gặp của Whisper
         if not text or text in ["1", "1.", "Đây là câu nói tiếng Việt.", transcription_prompt]:
             return {"text": ""}
 
         return {"text": text}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -63,10 +83,7 @@ async def create_transcription(
 @router.websocket("/stream")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    groq_api_key = settings.groq_api_key
-    if not groq_api_key:
-        await websocket.close(code=1011)
-        return
+    router_svc: RouterService = websocket.app.state.router_service
 
     try:
         while True:
@@ -86,35 +103,43 @@ async def websocket_endpoint(websocket: WebSocket):
                 async with aiofiles.open(temp_path, "wb") as temp_file:
                     await temp_file.write(data)
 
-                # Call Groq transcription API
-                import httpx
-                async with httpx.AsyncClient() as client:
-                    with open(temp_path, "rb") as audio_file:
-                        mime_type = "audio/webm" if suffix == ".webm" else "audio/mp4"
-                        files = {"file": (temp_path, audio_file, mime_type)}
-                        data_payload = {
-                            "model": "whisper-large-v3",
-                            "language": "vi",
-                            "temperature": "0.0",
-                            "prompt": "Đây là câu nói tiếng Việt."
-                        }
+                # Failover audio chain
+                audio_chain = ["groq", "openai"]
+                success = False
+                last_error = None
+                text = ""
 
-                        response = await client.post(
-                            "https://api.groq.com/openai/v1/audio/transcriptions",
-                            headers={"Authorization": f"Bearer {groq_api_key}"},
-                            files=files,
-                            data=data_payload,
-                            timeout=30.0
-                        )
+                for provider_key in audio_chain:
+                    provider = PROVIDER_REGISTRY.get(provider_key)
+                    if not provider or not router_svc._has_api_key(provider):
+                        continue
 
-                    if response.status_code == 200:
-                        result = response.json()
-                        text = result.get("text", "").strip()
-                        # Lọc bỏ các kết quả bịa đặt thường gặp của Whisper
-                        if text and text not in ["1", "1.", "Đây là câu nói tiếng Việt."]:
-                            await websocket.send_json({"text": text})
-                    else:
-                        await websocket.send_json({"error": f"Groq API error {response.status_code}: {response.text}"})
+                    model = "whisper-large-v3" if provider_key == "groq" else "whisper-1"
+                    try:
+                        client = router_svc.get_client(provider)
+                        with open(temp_path, "rb") as audio_file:
+                            transcription = await client.audio.transcriptions.create(
+                                file=audio_file,
+                                model=model,
+                                language="vi",
+                                temperature=0.0,
+                                prompt="Đây là câu nói tiếng Việt.",
+                                response_format="json"
+                            )
+                        text = transcription.text.strip()
+                        success = True
+                        break
+                    except Exception as e:
+                        last_error = str(e)
+                        continue
+
+                if success:
+                    # Lọc bỏ các kết quả bịa đặt thường gặp của Whisper
+                    if text and text not in ["1", "1.", "Đây là câu nói tiếng Việt."]:
+                        await websocket.send_json({"text": text})
+                else:
+                    await websocket.send_json({"error": f"Transcription failed: {last_error}"})
+
             except Exception as e:
                 print(f"WebSocket STT Error: {e}")
                 await websocket.send_json({"error": str(e)})
