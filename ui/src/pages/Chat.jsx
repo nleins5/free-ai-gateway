@@ -95,7 +95,7 @@ const Chat = () => {
             const saved = localStorage.getItem('chat_sessions');
             if (saved) return JSON.parse(saved);
         } catch (e) { console.error("Failed to parse sessions", e); }
-        return [{ id: Date.now(), title: 'New Chat', messages: [defaultMessage] }];
+        return [{ id: Date.now(), title: 'New Chat', messages: [defaultMessage], server_id: null }];
     });
     
     const [activeSessionId, setActiveSessionId] = useState(() => {
@@ -110,6 +110,9 @@ const Chat = () => {
         const active = sessions.find(s => s.id === activeSessionId);
         return active ? active.messages : [defaultMessage];
     });
+
+    // Derived: server conversation ID for the active session
+    const activeConversationServerId = sessions.find(s => s.id === activeSessionId)?.server_id || null;
 
     useEffect(() => {
         setSessions(prev => {
@@ -131,15 +134,48 @@ const Chat = () => {
         });
     }, [messages, activeSessionId]);
 
+    // ── Create server conversation in background ──
+    const createServerConversation = async (localSessionId, title = 'New Chat') => {
+        try {
+            const gatewayKey = import.meta.env.VITE_GATEWAY_SECRET || '';
+            const headers = { 'Content-Type': 'application/json' };
+            if (gatewayKey) headers['X-Gateway-Key'] = gatewayKey;
+
+            const res = await fetch(`${API_BASE}/v1/conversations`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ title }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                // Link local session to server conversation
+                setSessions(prev => {
+                    const updated = prev.map(s =>
+                        s.id === localSessionId ? { ...s, server_id: data.id } : s
+                    );
+                    localStorage.setItem('chat_sessions', JSON.stringify(updated));
+                    return updated;
+                });
+                return data.id;
+            }
+        } catch (err) {
+            console.warn('Failed to create server conversation:', err);
+        }
+        return null;
+    };
+
     const handleNewChat = () => {
         const newSession = {
             id: Date.now(),
             title: 'New Chat',
-            messages: [defaultMessage]
+            messages: [defaultMessage],
+            server_id: null,
         };
         setSessions(prev => [newSession, ...prev]);
         setActiveSessionId(newSession.id);
         setMessages(newSession.messages);
+        // Create server conversation in background
+        createServerConversation(newSession.id);
     };
 
     const switchSession = (id) => {
@@ -282,6 +318,17 @@ const Chat = () => {
 
         // Warmup ping — wakes up Render before user sends first message
         fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+
+        // ── Hybrid sync: ensure active session has a server_id ──
+        // If the first session has no server_id, create one in background
+        try {
+            const savedSessions = JSON.parse(localStorage.getItem('chat_sessions') || '[]');
+            if (savedSessions.length > 0 && !savedSessions[0].server_id) {
+                createServerConversation(savedSessions[0].id, savedSessions[0].title);
+            }
+        } catch (e) {
+            // ignore
+        }
     }, []);
 
     const scrollToBottom = () => {
@@ -376,7 +423,8 @@ const Chat = () => {
                 use_rag: mode === 'research',
                 user_tier: isLoggedIn ? (userPlan === 'vip' ? 'vip' : 'free') : 'guest',
                 guest_prompt_count: promptCount,  // client tracks this — survives backend cold starts
-                history
+                history,
+                conversation_id: activeConversationServerId,  // hybrid sync
             });
 
             const controller = new AbortController();
@@ -487,6 +535,25 @@ const Chat = () => {
                         const newCount = promptCount + 1;
                         setPromptCount(newCount);
                         localStorage.setItem('prompt_count', newCount.toString());
+
+                        // ── Sync to server conversation (hybrid persistence) ──
+                        if (activeConversationServerId) {
+                            try {
+                                await fetch(`${API_BASE}/v1/conversations/${activeConversationServerId}/messages`, {
+                                    method: 'POST',
+                                    headers: standardHeaders,
+                                    body: JSON.stringify({
+                                        user_content: currentInput,
+                                        assistant_content: fullContent,
+                                        provider: finalProvider,
+                                        model: parsed.model || '',
+                                    }),
+                                });
+                            } catch (syncErr) {
+                                console.warn('Failed to sync messages to server:', syncErr);
+                            }
+                        }
+
                         break;
                     }
                 }

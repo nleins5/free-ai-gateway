@@ -62,3 +62,4 @@ class UnifiedAIChatRequest(BaseModel):
     user_tier: Optional[str] = "guest"  # "guest" | "free" | "vip"
     guest_prompt_count: Optional[int] = 0  # client-side count, used for tier routing (survives backend restarts)
     history: Optional[List[Message]] = []
+    conversation_id: Optional[str] = None  # server-side conversation for persistent chat history

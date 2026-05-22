@@ -161,3 +161,63 @@ async def delete_conversation(
     await db.execute(delete(ChatMessage).where(ChatMessage.conversation_id == conversation_id))
     await db.execute(delete(Conversation).where(Conversation.id == conversation_id))
     return {"status": "deleted", "id": conversation_id}
+
+
+# ── Hybrid Sync: save message pair after streaming ──────────────────
+
+
+class MessagePairCreate(BaseModel):
+    user_content: str
+    assistant_content: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+@router.post("/{conversation_id}/messages")
+async def append_messages(
+    conversation_id: str,
+    body: MessagePairCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Save a user+assistant message pair to an existing conversation.
+    Called by the frontend after a streaming response completes.
+    Also auto-generates conversation title from the first user message.
+    """
+    result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Save user message
+    db.add(ChatMessage(
+        conversation_id=conv.id,
+        role="user",
+        content=body.user_content,
+    ))
+
+    # Save assistant response
+    db.add(ChatMessage(
+        conversation_id=conv.id,
+        role="assistant",
+        content=body.assistant_content,
+        provider=body.provider,
+        model=body.model,
+    ))
+
+    # Auto-title: if still default "New Conversation", use first user message
+    if conv.title in ("New Conversation", "New Chat"):
+        conv.title = body.user_content[:60] + ("..." if len(body.user_content) > 60 else "")
+
+    # Touch updated_at
+    import datetime
+    conv.updated_at = datetime.datetime.now(datetime.timezone.utc)
+
+    await db.flush()
+
+    return {
+        "status": "saved",
+        "conversation_id": conv.id,
+        "title": conv.title,
+        "messages_added": 2,
+    }
