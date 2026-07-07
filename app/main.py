@@ -80,23 +80,36 @@ async def load_custom_providers_from_db():
 async def lifespan(app: FastAPI):
     # Skip DB initialization in serverless environments
     is_serverless = os.getenv('VERCEL') == '1'
+    db_available = False
 
     if not is_serverless:
-        # Initialize Database only in local/dev
-        await init_db()
+        # Initialize Database — graceful failure so app doesn't crash
+        try:
+            await init_db()
+            db_available = True
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.warning(f"Database unavailable — running without persistence: {e}")
 
-        # ── Load persisted custom providers from DB ──────────────────
-        await load_custom_providers_from_db()
+        if db_available:
+            # ── Load persisted custom providers from DB ──────────────────
+            await load_custom_providers_from_db()
 
         # Initialize RAG Store and Service (local only)
-        rag_store = SimpleRAGStore(RAG_STORE_PATH)
-        await rag_store.initialize()
-        app.state.rag_service = RAGService(rag_store)
+        try:
+            rag_store = SimpleRAGStore(RAG_STORE_PATH)
+            await rag_store.initialize()
+            app.state.rag_service = RAGService(rag_store)
+        except Exception as e:
+            logger.warning(f"RAG store init failed: {e}")
+            app.state.rag_service = None
     else:
         # Serverless: use in-memory storage
         app.state.rag_service = None
 
-    # Initialize StateStore and RouterService (these work in serverless)
+    app.state.db_available = db_available
+
+    # Initialize StateStore and RouterService (these work without DB)
     state_store = StateStore()
     app.state.state_store = state_store
     app.state.router_service = RouterService(state_store)
