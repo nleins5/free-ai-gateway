@@ -56,6 +56,9 @@ class ProviderHealth:
     def is_healthy(self) -> bool:
         """Check if provider is healthy enough to receive traffic."""
         if self.consecutive_failures >= PROVIDER_FAILURE_THRESHOLD:
+            # Allow recovery after 30 seconds even if consecutively failed
+            if self.last_success_time and (time.time() - self.last_success_time) > 30:
+                return True  # Give it another chance
             return False
         if self.request_count >= 10 and self.success_rate < 0.3:
             return False
@@ -198,11 +201,18 @@ class RouterService:
 
         if not available:
             logger.warning(f"No healthy providers available (unhealthy: {skipped_unhealthy}), relaxing constraints")
-            # Relax constraints: try all providers with valid keys, even if unhealthy
+            # Level 1: try unhealthy providers from the requested chain
             for key in active_keys:
                 p = PROVIDER_REGISTRY.get(key)
                 if p and self._has_api_key(p):
                     available.append(p)
+
+            # Level 2: try ENTIRE registry (any provider with a key)
+            if not available:
+                logger.warning("Chain exhausted — falling back to entire provider registry")
+                for key, p in PROVIDER_REGISTRY.items():
+                    if self._has_api_key(p) and p not in available:
+                        available.append(p)
 
             if not available:
                 return []
@@ -317,18 +327,22 @@ class RouterService:
         # Resolve task tier → provider chain
         resolved_task = task or "general"
         chain = settings.task_tiers.get(resolved_task, settings.provider_chain)
-
         providers = self._get_ordered_providers(chain, resolved_task)
 
         if not providers:
             logger.warning("All providers on cooldown or unhealthy, falling back to full registry")
+            # Try healthy providers from entire registry
             providers = [p for p in PROVIDER_REGISTRY.values()
-                        if self.get_health(p.key).is_healthy()]
-            if not providers:
-                raise HTTPException(
-                    status_code=503,
-                    detail="All providers are currently unavailable. Please try again later."
-                )
+                        if self._has_api_key(p) and self.get_health(p.key).is_healthy()]
+        if not providers:
+            # Last resort: try ALL providers with keys, ignore health/cooldown entirely
+            logger.warning("Last resort: trying all providers regardless of health status")
+            providers = [p for p in PROVIDER_REGISTRY.values() if self._has_api_key(p)]
+        if not providers:
+            raise HTTPException(
+                status_code=503,
+                detail="All AI providers are currently unavailable. Please try again later."
+            )
 
         errors = []
         start_time = time.time()
@@ -552,13 +566,17 @@ class RouterService:
 
         if not providers:
             providers = [p for p in PROVIDER_REGISTRY.values()
-                        if self.get_health(p.key).is_healthy()]
-            if not providers:
-                yield {
-                    "error": "ServiceUnavailable",
-                    "message": "All providers are currently unavailable."
-                }
-                return
+                        if self._has_api_key(p) and self.get_health(p.key).is_healthy()]
+        if not providers:
+            # Last resort: try ALL providers with keys, ignore health/cooldown
+            logger.warning("Stream: last resort — trying all providers regardless of health")
+            providers = [p for p in PROVIDER_REGISTRY.values() if self._has_api_key(p)]
+        if not providers:
+            yield {
+                "error": "ServiceUnavailable",
+                "message": "All providers are currently unavailable."
+            }
+            return
 
         errors = []
 

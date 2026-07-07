@@ -46,7 +46,6 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
     "ollama": (0.0, 0.0),
     "together": (0.0, 0.0),
     "xai": (0.0, 0.0),
-    "claude": (0.0, 0.0),
     "nvidia": (0.0, 0.0),
     "nvidia_33": (0.0, 0.0),
     "nvidia_77": (0.0, 0.0),
@@ -66,8 +65,6 @@ COST_PER_1M: Dict[str, Tuple[float, float]] = {
     "stepfun": (0.0, 0.0),
     "zhipu": (0.0, 0.0),
     "baichuan": (0.0, 0.0),
-    "grok": (0.0, 0.0),
-    "qwen": (0.0, 0.0),
     "hunyuan": (0.0, 0.0),
     "jina": (0.0, 0.0),
     "yi": (0.0, 0.0),
@@ -106,7 +103,7 @@ TIER_VIP_CHAIN = [s.strip() for s in os.getenv("TIER_VIP_CHAIN", "deepinfra,novi
 # STANDARD: prompt 2 — Good quality, reliable
 TIER_STANDARD_CHAIN = [s.strip() for s in os.getenv("TIER_STANDARD_CHAIN", "groq,gemini,cloudflare,github").split(",") if s.strip()]
 # FREE: prompt 3+ (logged in free users) — Always-on free providers
-TIER_FREE_CHAIN = [s.strip() for s in os.getenv("TIER_FREE_CHAIN", "cloudflare,openrouter,huggingface,groq,transformerrobotics").split(",") if s.strip()]
+TIER_FREE_CHAIN = [s.strip() for s in os.getenv("TIER_FREE_CHAIN", "cloudflare,openrouter,huggingface,groq,deepinfra,novita").split(",") if s.strip()]
 
 class Settings:
     """Mutable runtime settings — reloaded from providers.json on demand."""
