@@ -11,7 +11,6 @@
     "openrouter",
     "xai",
     "together",
-    "claude",
     "nvidia",
     "nvidia_33",
     "nvidia_77",
@@ -31,8 +30,6 @@
     "stepfun",
     "zhipu",
     "baichuan",
-    "grok",
-    "qwen",
     "hunyuan",
     "jina",
     "yi",
@@ -79,7 +76,7 @@
     "research": [
       "gemini",
       "github",
-      "claude",
+      "anthropic",
       "xai",
       "openrouter",
       "nvidia",
@@ -120,7 +117,7 @@
       "gemini",
       "groq",
       "cloudflare",
-      "qwen"
+      "alibaba"
     ],
     "code": [
       "github",
@@ -146,13 +143,12 @@
       "github",
       "xai",
       "together",
-      "claude",
+      "anthropic",
       "nvidia",
       "nvidia_33",
       "nvidia_77",
       "nvidia_custom",
       "deepseek",
-      "o1",
       "chutes",
       "doubleword"
     ],
@@ -223,11 +219,10 @@
       "zhipu"
     ],
     "smart": [
-      "claude",
+      "anthropic",
       "gemini",
-      "o1",
-      "deepseek-r1",
-      "grok",
+      "deepseek",
+      "xai",
       "chutes",
       "ninerouter",
       "doubleword"
@@ -244,7 +239,6 @@
     "openrouter": 1,
     "xai": 1,
     "together": 1,
-    "claude": 1,
     "nvidia": 2,
     "nvidia_33": 2,
     "nvidia_77": 2,
@@ -264,8 +258,6 @@
     "stepfun": 1,
     "zhipu": 2,
     "baichuan": 1,
-    "grok": 1,
-    "qwen": 1,
     "hunyuan": 1,
     "jina": 1,
     "yi": 1,
@@ -283,5 +275,5 @@
     "alert_threshold_usd": 0,
     "_comment": "0 = unlimited. Set a value to auto-block requests when exceeded."
   },
-  "updated_at": "2026-05-17T17:15:00Z"
+  "updated_at": "2026-07-07T21:12:00Z"
 }

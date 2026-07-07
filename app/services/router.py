@@ -1,6 +1,7 @@
 import os
 import time
 import random
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Tuple, AsyncGenerator
 from fastapi import HTTPException
@@ -420,6 +421,11 @@ class RouterService:
                     if not self._is_retryable(exc):
                         break
 
+                    # Exponential backoff before retry (0.5s, 1s, 2s)
+                    if attempt < MAX_RETRIES_PER_PROVIDER:
+                        backoff = min(0.5 * (2 ** attempt), 3.0)
+                        await asyncio.sleep(backoff)
+
             # Provider failed after all retries
             if last_error:
                 error_type = self._classify_error(last_error)
@@ -608,11 +614,12 @@ class RouterService:
 
                 try:
                     stream = await client.chat.completions.create(**payload)
-                    health.record_success(0)  # Mark as responsive
-                    self.state_store.mark_success(provider.key)
+                    # DON'T record success yet — stream hasn't completed
 
                     # Stream the response
+                    chunk_count = 0
                     async for chunk in stream:
+                        chunk_count += 1
                         usage = getattr(chunk, "usage", None)
                         if usage:
                             t_in = getattr(usage, "prompt_tokens", 0)
@@ -625,7 +632,10 @@ class RouterService:
                             "model": model,
                         }
 
-                    # Success - break out of retry loop
+                    # Stream completed successfully — NOW record success
+                    health.record_success(0)
+                    self.state_store.mark_success(provider.key)
+                    logger.info(f"Stream success: {provider.key} ({model}), {chunk_count} chunks")
                     return
 
                 except Exception as exc:
@@ -640,6 +650,11 @@ class RouterService:
                         break
                     if not self._is_retryable(exc):
                         break
+
+                    # Exponential backoff before retry
+                    if attempt < MAX_RETRIES_PER_PROVIDER:
+                        backoff = min(0.5 * (2 ** attempt), 3.0)
+                        await asyncio.sleep(backoff)
 
             if last_error:
                 error_type = self._classify_error(last_error)
