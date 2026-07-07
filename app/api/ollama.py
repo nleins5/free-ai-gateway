@@ -3,11 +3,12 @@ Ollama-compatible endpoint — /api/generate & /api/chat & /api/tags
 
 Drop-in replacement for any system calling an Ollama server.
 Just change the base URL, zero other code changes needed.
+Rate-limited to prevent abuse on public endpoints.
 """
 
 from typing import Optional, List, Dict, Any, AsyncGenerator
-from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import json
 import time
@@ -15,8 +16,21 @@ import time
 from app.dependencies import get_router_service
 from app.services.router import RouterService
 from app.core.providers import PROVIDER_REGISTRY
+from app.core.rate_limit import rate_limiter
 
 router = APIRouter()
+
+
+async def _check_rate_limit(request: Request):
+    """Dependency: enforce rate limiting by client IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, info = rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded ({info['limit']}/min). Retry after {info['retry_after']}s.",
+            headers={"Retry-After": str(info["retry_after"])},
+        )
 
 
 # ── Request models ─────────────────────────────────────────────
@@ -128,7 +142,7 @@ async def _run_stream(router_svc, messages, temperature, max_tokens, fmt):
 
 # ── POST /api/generate ─────────────────────────────────────────
 
-@router.post("/generate")
+@router.post("/generate", dependencies=[Depends(_check_rate_limit)])
 async def ollama_generate(
     req: OllamaGenerateRequest,
     router_svc: RouterService = Depends(get_router_service),
@@ -176,7 +190,7 @@ async def ollama_generate(
 
 # ── POST /api/chat ─────────────────────────────────────────────
 
-@router.post("/chat")
+@router.post("/chat", dependencies=[Depends(_check_rate_limit)])
 async def ollama_chat(
     req: OllamaChatRequest,
     router_svc: RouterService = Depends(get_router_service),

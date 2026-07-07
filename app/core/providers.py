@@ -108,14 +108,7 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         model_env="XAI_MODEL",
         default_model="grok-2",
     ),
-    "claude": Provider(
-        key="claude",
-        name="Anthropic (via Proxy)",
-        base_url=os.getenv("CLAUDE_BASE_URL", "https://api.anthropic.com/v1"),
-        api_key_env="ANTHROPIC_API_KEY",
-        model_env="CLAUDE_MODEL",
-        default_model="claude-3-5-sonnet-20241022",
-    ),
+
     "nvidia": Provider(
         key="nvidia",
         name="NVIDIA NIM",
@@ -261,22 +254,8 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         model_env="BAICHUAN_MODEL",
         default_model="Baichuan4-Turbo",
     ),
-    "grok": Provider(
-        key="grok",
-        name="xAI Grok",
-        base_url="https://api.x.ai/v1",
-        api_key_env="GROK_API_KEY",
-        model_env="GROK_MODEL",
-        default_model="grok-2-1212",
-    ),
-    "qwen": Provider(
-        key="qwen",
-        name="Alibaba Qwen (DashScope)",
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        api_key_env="QWEN_API_KEY",
-        model_env="QWEN_MODEL",
-        default_model="qwen-max",
-    ),
+
+
     "hunyuan": Provider(
         key="hunyuan",
         name="Tencent Hunyuan",

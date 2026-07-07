@@ -290,12 +290,13 @@ async def add_provider(request: Request, db: AsyncSession = Depends(get_db)):
     if existing.scalar_one_or_none():
         return {"status": "error", "message": f"Provider '{key}' already exists. Delete it first to re-add."}
 
-    # Persist to DB
+    # Persist to DB (encrypt API key)
+    from app.core.encryption import encrypt_key
     cp = CustomProvider(
         key=key,
         name=name,
         base_url=base_url,
-        api_key=api_key_val,
+        api_key=encrypt_key(api_key_val),
         default_model=default_model,
         weight=weight,
         tasks=tasks,

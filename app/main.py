@@ -48,9 +48,10 @@ async def load_custom_providers_from_db():
             if cp.key in PROVIDER_REGISTRY:
                 continue  # Skip if already registered (e.g., after hot-reload)
 
-            # Inject API key into environment
+            # Inject API key into environment (decrypt from DB)
+            from app.core.encryption import decrypt_key
             env_key = f"CUSTOM_{cp.key.upper()}_API_KEY"
-            os.environ[env_key] = cp.api_key
+            os.environ[env_key] = decrypt_key(cp.api_key)
 
             PROVIDER_REGISTRY[cp.key] = Provider(
                 key=cp.key,
