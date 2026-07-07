@@ -54,11 +54,18 @@ AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_co
 
 
 async def get_db():
-    """FastAPI dependency — yields an async DB session."""
+    """FastAPI dependency — yields an async DB session.
+    Only commits if there are pending changes (avoids unnecessary COMMITs on reads).
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+            # Only commit if there are actual pending changes
+            if session.dirty or session.new or session.deleted:
+                await session.commit()
+        except GeneratorExit:
+            # Client disconnected (e.g. streaming cancelled) — don't rollback/crash
+            pass
         except Exception:
             await session.rollback()
             raise
