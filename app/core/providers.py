@@ -366,13 +366,4 @@ PROVIDER_REGISTRY: Dict[str, Provider] = {
         model_env="DOUBLEWORD_MODEL",
         default_model="moonshotai/Kimi-K2.6",
     ),
-    # ─── PUBLIC OLLAMA ENDPOINTS (no key required) ────────────────
-    "transformerrobotics": Provider(
-        key="transformerrobotics",
-        name="TransformerRobotics",
-        base_url="https://agent.transformerrobotics.com/v1",
-        api_key_env="TRANSFORMERROBOTICS_API_KEY",   # set to "ollama" or leave blank
-        model_env="TRANSFORMERROBOTICS_MODEL",
-        default_model="gemma4:latest",
-    ),
 }

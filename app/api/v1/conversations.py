@@ -66,10 +66,23 @@ async def list_conversations(
     db: AsyncSession = Depends(get_db),
 ):
     """List conversations for the authenticated user."""
+    from sqlalchemy import func
     user = await _get_user_from_key(x_api_key, db) if x_api_key else None
     user_id = user.id if user else None
 
-    query = select(Conversation).order_by(Conversation.updated_at.desc())
+    # Single query with message count — avoids N+1
+    msg_count_subq = (
+        select(func.count(ChatMessage.id))
+        .where(ChatMessage.conversation_id == Conversation.id)
+        .correlate(Conversation)
+        .scalar_subquery()
+        .label("message_count")
+    )
+
+    query = (
+        select(Conversation, msg_count_subq)
+        .order_by(Conversation.updated_at.desc())
+    )
     if user_id:
         query = query.where(Conversation.user_id == user_id)
     else:
@@ -77,20 +90,16 @@ async def list_conversations(
     query = query.limit(50)
 
     result = await db.execute(query)
-    convs = result.scalars().all()
+    rows = result.all()
 
     out = []
-    for c in convs:
-        msg_count_result = await db.execute(
-            select(ChatMessage.id).where(ChatMessage.conversation_id == c.id)
-        )
-        count = len(msg_count_result.all())
+    for conv, msg_count in rows:
         out.append({
-            "id": c.id,
-            "title": c.title,
-            "created_at": str(c.created_at),
-            "updated_at": str(c.updated_at),
-            "message_count": count,
+            "id": conv.id,
+            "title": conv.title,
+            "created_at": str(conv.created_at),
+            "updated_at": str(conv.updated_at),
+            "message_count": msg_count or 0,
         })
     return {"conversations": out}
 

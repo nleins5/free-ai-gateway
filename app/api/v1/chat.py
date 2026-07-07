@@ -2,14 +2,14 @@ from typing import Optional, AsyncGenerator
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.concurrency import run_in_threadpool
 import re
 import json as json_lib
 
 from app.models import ChatRequest, UnifiedAIChatRequest
-from app.dependencies import get_router_service, get_rag_service
+from app.dependencies import get_router_service, get_rag_service, get_db_optional
 from app.services.router import RouterService
 from app.services.rag import RAGService
+from app.services.search import perform_web_search
 from app.database import get_db
 from app.db_models import RequestLog, ChatMessage, Conversation, User
 from app.core.prompts import get_task_system_prompt
@@ -18,14 +18,19 @@ from sqlalchemy import select
 router = APIRouter()
 
 
-async def _resolve_user(api_key: Optional[str], db: AsyncSession):
-    if not api_key:
+async def _resolve_user(api_key: Optional[str], db: Optional[AsyncSession]):
+    if not api_key or not db:
         return None
-    result = await db.execute(select(User).where(User.api_key == api_key, User.is_active))
-    return result.scalar_one_or_none()
+    try:
+        result = await db.execute(select(User).where(User.api_key == api_key, User.is_active))
+        return result.scalar_one_or_none()
+    except Exception:
+        return None
 
 
-async def _log_request(db: AsyncSession, user_id, provider, model, tokens_in, tokens_out, latency_ms, cost_usd, task, failover_trace=None, status="success", error_msg=None):
+async def _log_request(db: Optional[AsyncSession], user_id, provider, model, tokens_in, tokens_out, latency_ms, cost_usd, task, failover_trace=None, status="success", error_msg=None):
+    if not db:
+        return  # DB unavailable — skip logging silently
     import json
     log = RequestLog(
         user_id=user_id,
@@ -91,18 +96,19 @@ async def unified_chat(
     req: UnifiedAIChatRequest,
     router_svc: RouterService = Depends(get_router_service),
     rag_svc: RAGService = Depends(get_rag_service),
-    db: AsyncSession = Depends(get_db),
+    db: Optional[AsyncSession] = Depends(get_db_optional),
     x_api_key: str = Header(None, alias="X-API-Key"),
     x_conversation_id: str = Header(None, alias="X-Conversation-Id"),
 ):
     """
     High-level unified chat endpoint.
     Handles RAG integration and task-based routing.
+    Gracefully degrades when DB is unavailable.
     """
     user = await _resolve_user(x_api_key, db)
     
     # Auto-register guest users from frontend if they don't exist
-    if not user and req.user_id:
+    if not user and req.user_id and db:
         result = await db.execute(select(User).where(User.id == req.user_id))
         user = result.scalar_one_or_none()
         if not user:
@@ -124,72 +130,7 @@ async def unified_chat(
     
     # 1. Handle Web Search (Research Mode) if requested
     if req.use_rag:
-        def perform_web_search(q):
-            results = []
-            
-            # Tự động tiêm thông tin chất lượng cao nếu truy vấn liên quan đến anh Huỳnh Vũ Tuấn Tú
-            lower_q = q.lower()
-            if "huỳnh vũ tuấn tú" in lower_q or "huynh vu tuan tu" in lower_q:
-                results.append({
-                    "title": "Dự án sáng tạo EZD của sinh viên Nhà UEF liên tục đạt giải cao tại các sân chơi về khởi nghiệp",
-                    "href": "https://www.uef.edu.vn/tin-tuc-su-kien/mang-du-an-khoi-nghiep-chinh-chien-khap-cac-san-choi-uefers-mang-ve-nhieu-thanh-tich-dang-tu-hao-27242",
-                    "body": (
-                        "Huỳnh Vũ Tuấn Tú là sinh viên Khoa Công nghệ thông tin tại Trường Đại học Kinh tế – Tài chính TP.HCM (UEF). "
-                        "Anh là đồng sáng lập (Cofounder) và Giám đốc vận hành (COO) của dự án EZD – nền tảng phát triển năng lực và kết nối thực tập sinh với doanh nghiệp. "
-                        "Dự án EZD đã gặt hái nhiều thành tích ấn tượng tại các cuộc thi khởi nghiệp lớn: "
-                        "Quán quân cuộc thi Young Innovators 2024 do UEF tổ chức; "
-                        "Top 10 toàn quốc cuộc thi Startup Wheel 2024; "
-                        "Á quân cuộc thi khởi nghiệp Flag Up (Đại học Quốc tế - ĐHQG TP.HCM) và cuộc thi NTTU; "
-                        "Giải Dự án được yêu thích nhất tại UNIV.STAR 2024."
-                    )
-                })
-            
-            try:
-                try:
-                    from ddgs import DDGS
-                except ImportError:
-                    from duckduckgo_search import DDGS
-                with DDGS() as ddgs:
-                    # 1. Tìm kiếm thô sơ theo truy vấn ban đầu
-                    results.extend(list(ddgs.text(q, max_results=5)))
-                    
-                    # 2. Nhận dạng tên riêng (Proper Nouns) tiếng Việt viết hoa để tìm kiếm sâu hơn
-                    import re
-                    proper_nouns = re.findall(r'\b[A-ZÀ-Ỹ][a-zà-ỹ]*(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]*)*\b', q)
-                    proper_nouns = [name for name in proper_nouns if len(name.split()) >= 2]
-                    
-                    if not proper_nouns:
-                        clean_q = re.sub(r'(anh|chị|ông|bà|là ai|ở đâu|thế nào|\?)', '', q, flags=re.IGNORECASE).strip()
-                        if clean_q:
-                            proper_nouns = [clean_q]
-                            
-                    for name in proper_nouns:
-                        try:
-                            # Tìm kiếm kết hợp UEF
-                            results.extend(list(ddgs.text(f'"{name}" uef', max_results=3)))
-                        except Exception:
-                            pass
-                        try:
-                            # Tìm kiếm chính xác tên
-                            results.extend(list(ddgs.text(f'"{name}"', max_results=3)))
-                        except Exception:
-                            pass
-            except Exception as e:
-                import logging
-                logging.error(f"Web search failed: {e}")
-                
-            # Loại bỏ kết quả trùng lặp URL
-            seen_urls = set()
-            unique_results = []
-            for r in results:
-                href = r.get("href")
-                if href and href not in seen_urls:
-                    seen_urls.add(href)
-                    unique_results.append(r)
-                    
-            return unique_results[:8]
-        
-        search_results = await run_in_threadpool(perform_web_search, req.query)
+        search_results = await perform_web_search(req.query)
         if search_results:
             context_str = ""
             for idx, res in enumerate(search_results):
@@ -225,7 +166,7 @@ async def unified_chat(
     answer = re.sub(r'<think>[\s\S]*?</think>\s*', '', raw_answer).strip() or raw_answer
     usage = response.usage
 
-    # 3. Log to database
+    # 3. Log to database (skip if DB unavailable)
     t_in = getattr(usage, "prompt_tokens", 0) if usage else 0
     t_out = getattr(usage, "completion_tokens", 0) if usage else 0
     from app.config import COST_PER_1M
@@ -241,29 +182,32 @@ async def unified_chat(
         failover_trace=meta.get("failover_trace"),
     )
 
-    # 4. Save to conversation if provided
-    if x_conversation_id:
-        conv_result = await db.execute(
-            select(Conversation).where(Conversation.id == x_conversation_id)
-        )
-        conv = conv_result.scalar_one_or_none()
-        if conv:
-            # Save user message
-            db.add(ChatMessage(
-                conversation_id=conv.id,
-                role="user",
-                content=req.query,
-            ))
-            # Save assistant response
-            import json
-            db.add(ChatMessage(
-                conversation_id=conv.id,
-                role="assistant",
-                content=answer,
-                provider=meta["provider"],
-                model=meta["model"],
-                failover_trace=json.dumps(meta.get("failover_trace")) if meta.get("failover_trace") else None
-            ))
+    # 4. Save to conversation if provided (skip if DB unavailable)
+    if x_conversation_id and db:
+        try:
+            conv_result = await db.execute(
+                select(Conversation).where(Conversation.id == x_conversation_id)
+            )
+            conv = conv_result.scalar_one_or_none()
+            if conv:
+                # Save user message
+                db.add(ChatMessage(
+                    conversation_id=conv.id,
+                    role="user",
+                    content=req.query,
+                ))
+                # Save assistant response
+                import json
+                db.add(ChatMessage(
+                    conversation_id=conv.id,
+                    role="assistant",
+                    content=answer,
+                    provider=meta["provider"],
+                    model=meta["model"],
+                    failover_trace=json.dumps(meta.get("failover_trace")) if meta.get("failover_trace") else None
+                ))
+        except Exception:
+            pass  # DB issue — don't crash the response
 
     return {
         "answer": answer,
@@ -277,7 +221,7 @@ async def unified_chat_stream(
     req: UnifiedAIChatRequest,
     router_svc: RouterService = Depends(get_router_service),
     rag_svc: RAGService = Depends(get_rag_service),
-    db: AsyncSession = Depends(get_db),
+    db: Optional[AsyncSession] = Depends(get_db_optional),
     x_api_key: str = Header(None, alias="X-API-Key"),
 ):
     """
@@ -288,72 +232,7 @@ async def unified_chat_stream(
     messages = []
 
     if req.use_rag:
-        def perform_web_search(q):
-            results = []
-            
-            # Tự động tiêm thông tin chất lượng cao nếu truy vấn liên quan đến anh Huỳnh Vũ Tuấn Tú
-            lower_q = q.lower()
-            if "huỳnh vũ tuấn tú" in lower_q or "huynh vu tuan tu" in lower_q:
-                results.append({
-                    "title": "Dự án sáng tạo EZD của sinh viên Nhà UEF liên tục đạt giải cao tại các sân chơi về khởi nghiệp",
-                    "href": "https://www.uef.edu.vn/tin-tuc-su-kien/mang-du-an-khoi-nghiep-chinh-chien-khap-cac-san-choi-uefers-mang-ve-nhieu-thanh-tich-dang-tu-hao-27242",
-                    "body": (
-                        "Huỳnh Vũ Tuấn Tú là sinh viên Khoa Công nghệ thông tin tại Trường Đại học Kinh tế – Tài chính TP.HCM (UEF). "
-                        "Anh là đồng sáng lập (Cofounder) và Giám đốc vận hành (COO) của dự án EZD – nền tảng phát triển năng lực và kết nối thực tập sinh với doanh nghiệp. "
-                        "Dự án EZD đã gặt hái nhiều thành tích ấn tượng tại các cuộc thi khởi nghiệp lớn: "
-                        "Quán quân cuộc thi Young Innovators 2024 do UEF tổ chức; "
-                        "Top 10 toàn quốc cuộc thi Startup Wheel 2024; "
-                        "Á quân cuộc thi khởi nghiệp Flag Up (Đại học Quốc tế - ĐHQG TP.HCM) và cuộc thi NTTU; "
-                        "Giải Dự án được yêu thích nhất tại UNIV.STAR 2024."
-                    )
-                })
-            
-            try:
-                try:
-                    from ddgs import DDGS
-                except ImportError:
-                    from duckduckgo_search import DDGS
-                with DDGS() as ddgs:
-                    # 1. Tìm kiếm thô sơ theo truy vấn ban đầu
-                    results.extend(list(ddgs.text(q, max_results=5)))
-                    
-                    # 2. Nhận dạng tên riêng (Proper Nouns) tiếng Việt viết hoa để tìm kiếm sâu hơn
-                    import re
-                    proper_nouns = re.findall(r'\b[A-ZÀ-Ỹ][a-zà-ỹ]*(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]*)*\b', q)
-                    proper_nouns = [name for name in proper_nouns if len(name.split()) >= 2]
-                    
-                    if not proper_nouns:
-                        clean_q = re.sub(r'(anh|chị|ông|bà|là ai|ở đâu|thế nào|\?)', '', q, flags=re.IGNORECASE).strip()
-                        if clean_q:
-                            proper_nouns = [clean_q]
-                            
-                    for name in proper_nouns:
-                        try:
-                            # Tìm kiếm kết hợp UEF
-                            results.extend(list(ddgs.text(f'"{name}" uef', max_results=3)))
-                        except Exception:
-                            pass
-                        try:
-                            # Tìm kiếm chính xác tên
-                            results.extend(list(ddgs.text(f'"{name}"', max_results=3)))
-                        except Exception:
-                            pass
-            except Exception as e:
-                import logging
-                logging.error(f"Web search failed: {e}")
-                
-            # Loại bỏ kết quả trùng lặp URL
-            seen_urls = set()
-            unique_results = []
-            for r in results:
-                href = r.get("href")
-                if href and href not in seen_urls:
-                    seen_urls.add(href)
-                    unique_results.append(r)
-                    
-            return unique_results[:8]
-
-        search_results = await run_in_threadpool(perform_web_search, req.query)
+        search_results = await perform_web_search(req.query)
         if search_results:
             context_str = ""
             for idx, res in enumerate(search_results):
@@ -411,23 +290,24 @@ async def unified_chat_stream(
                         yield f"data: {json_lib.dumps({'token': content, 'provider': final_provider})}\n\n"
                     if finish_reason == "stop":
                         latency_ms = (_time.time() - start_ts) * 1000
-                        # Log to DB asynchronously (fire-and-forget style)
+                        # Log to DB using a SEPARATE session (the request's session may be closed)
                         try:
+                            from app.database import AsyncSessionLocal
                             from app.config import COST_PER_1M
-                            rates = COST_PER_1M.get(final_provider, (0.0, 0.0))
-                            log = RequestLog(
-                                user_id=req.user_id,
-                                provider=final_provider or 'unknown',
-                                model=final_model or 'unknown',
-                                latency_ms=latency_ms,
-                                cost_usd=0.0,
-                                task_type=req.task or 'general',
-                                status='success',
-                            )
-                            db.add(log)
-                            await db.commit()
+                            async with AsyncSessionLocal() as log_db:
+                                log = RequestLog(
+                                    user_id=req.user_id,
+                                    provider=final_provider or 'unknown',
+                                    model=final_model or 'unknown',
+                                    latency_ms=latency_ms,
+                                    cost_usd=0.0,
+                                    task_type=req.task or 'general',
+                                    status='success',
+                                )
+                                log_db.add(log)
+                                await log_db.commit()
                         except Exception:
-                            pass
+                            pass  # Don't crash the stream for a logging failure
                         yield f"data: {json_lib.dumps({'done': True, 'provider': final_provider, 'model': final_model})}\n\n"
                         return
 

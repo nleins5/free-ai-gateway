@@ -7,7 +7,11 @@ import aiofiles
 load_dotenv()
 
 # --- CONSTANTS ---
-ADMIN_SECRET = os.getenv("ADMIN_SECRET", "changeme")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+if ADMIN_SECRET in ("", "changeme") and os.getenv("RENDER"):
+    import logging as _log
+    _log.warning("⚠️  ADMIN_SECRET is not set or is 'changeme'! Admin endpoints are unprotected. Set ADMIN_SECRET env var on Render.")
+
 GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")  # Shared secret for Vercel↔Render auth
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 PROVIDERS_JSON_PATH = os.getenv("PROVIDERS_JSON_PATH", "providers.json")

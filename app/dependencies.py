@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import Header, HTTPException, Request
 from app.config import settings, GATEWAY_SECRET
 from app.services.router import RouterService
@@ -30,4 +31,24 @@ def get_rag_service(request: Request) -> RAGService:
 
 def get_image_service() -> ImageService:
     return image_service
+
+
+async def get_db_optional(request: Request):
+    """DB-aware dependency — returns None if database is unavailable.
+    Use this in endpoints that should degrade gracefully without DB.
+    """
+    if not getattr(request.app.state, 'db_available', False):
+        yield None
+        return
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            if session.dirty or session.new or session.deleted:
+                await session.commit()
+        except GeneratorExit:
+            pass
+        except Exception:
+            await session.rollback()
+            raise
 

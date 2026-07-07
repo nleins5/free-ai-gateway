@@ -272,10 +272,12 @@ async def health_check(request: Request):
     providers = all_states.get("providers", {})
     healthy = sum(1 for p in providers.values() if not p.get("on_cooldown", False))
     total = len(providers)
+    db_ok = getattr(request.app.state, 'db_available', False)
     return {
         "status": "online",
         "timestamp": time.time(),
-        "version": "2.1.0",
+        "version": "2.2.0",
+        "database": "connected" if db_ok else "disconnected",
         "providers": {"healthy": healthy, "total": total},
         "daily_cost_usd": all_states.get("total_cost_usd", 0),
     }
